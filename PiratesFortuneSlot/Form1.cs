@@ -78,6 +78,7 @@ namespace PiratesFortuneSlot
             this.Size = new Size(1920, 1200);
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
+            this.BackgroundImageLayout = ImageLayout.Stretch;
 
             lblBalance.Location = new Point(300, 1000);
             lblBalance.Font = new Font("Arial", 16);
@@ -213,7 +214,7 @@ namespace PiratesFortuneSlot
 
         private void tmrDrop_Tick(object sender, EventArgs e)
         {
-            const int dropSpeed = 50;
+            const int dropSpeed = 500;
             bool allDropped = true;
 
             for (int row = 0; row < ROWS; row++)
