@@ -94,18 +94,18 @@ namespace PiratesFortuneSlot
         {
             var symbolData = new[]
             {
-                new { Type = SymbolType.Ruby, ImageName = "Ruby.png", Payouts = new double[] {0.25, 0.5, 5}},
-                new { Type = SymbolType.Sapphire, ImageName = "Sapphire.png", Payouts = new double[] {0.25, 0.5, 5}},
-                new { Type = SymbolType.Emerald, ImageName = "Emerald.png", Payouts = new double[] {0.5, 1, 8}},
-                new { Type = SymbolType.RumBottle, ImageName = "RumBottle.png", Payouts = new double[] {1, 2, 10}},
-                new { Type = SymbolType.Compass, ImageName = "Compass.png", Payouts = new double[] {1, 2, 12}},
-                new { Type = SymbolType.Map, ImageName = "Map.png", Payouts = new double[] {2, 4, 15}},
-                new { Type = SymbolType.Parrot, ImageName = "Parrot.png", Payouts = new double[] {5, 10, 25}},
-                new { Type = SymbolType.PirateHat, ImageName = "PirateHat.png", Payouts = new double[] {10, 20, 50}},
-                new { Type = SymbolType.Ship, ImageName = "Ship.png", Payouts = new double[] {15, 25, 100}},
-                new { Type = SymbolType.Wild, ImageName = "Wild.png", Payouts = new double[] {0, 0, 0}},
-                new { Type = SymbolType.Scatter, ImageName = "Scatter.png", Payouts = new double[] {0, 0, 0}},
-                new { Type = SymbolType.GoldCoin, ImageName = "GoldCoin.png", Payouts = new double[] {0, 0, 0}}
+                new { Type = SymbolType.Ruby, ImageName = "Ruby.png", Payouts = new double[] {0.2, 0.4, 0.8, 2}},
+                new { Type = SymbolType.Sapphire, ImageName = "Sapphire.png", Payouts = new double[] {0.2, 0.4, 0.8, 2}},
+                new { Type = SymbolType.Emerald, ImageName = "Emerald.png", Payouts = new double[] {0.3, 0.6, 1.2, 3}},
+                new { Type = SymbolType.RumBottle, ImageName = "RumBottle.png", Payouts = new double[] {0.5, 1, 2, 5}},
+                new { Type = SymbolType.Compass, ImageName = "Compass.png", Payouts = new double[] {0.5, 1, 2, 6}},
+                new { Type = SymbolType.Map, ImageName = "Map.png", Payouts = new double[] {1, 2, 4, 8}},
+                new { Type = SymbolType.Parrot, ImageName = "Parrot.png", Payouts = new double[] {2, 4, 8, 15}},
+                new { Type = SymbolType.PirateHat, ImageName = "PirateHat.png", Payouts = new double[] {3, 6, 12, 20}},
+                new { Type = SymbolType.Ship, ImageName = "Ship.png", Payouts = new double[] {5, 10, 20, 40}},
+                new { Type = SymbolType.Wild, ImageName = "Wild.png", Payouts = new double[] {0, 0, 0, 0}},
+                new { Type = SymbolType.Scatter, ImageName = "Scatter.png", Payouts = new double[] {0, 0, 0, 0}},
+                new { Type = SymbolType.GoldCoin, ImageName = "GoldCoin.png", Payouts = new double[] {0, 0, 0, 0}}
             };
 
             foreach (var data in symbolData)
@@ -230,16 +230,16 @@ namespace PiratesFortuneSlot
                 for (int col = 0; col < COLS; col++)
                 {
                     int rand = rnd.Next(100);
-                    if (rand < 40) grid[row, col] = validSymbols[rnd.Next(0, 3)];
-                    else if (rand < 70) grid[row, col] = validSymbols[rnd.Next(3, 6)];
-                    else if (rand < 90) grid[row, col] = validSymbols[rnd.Next(6, 9)];
-                    else if (rand < 95) grid[row, col] = SymbolType.Wild;
+                    if (rand < 50) grid[row, col] = validSymbols[rnd.Next(0, 3)];
+                    else if (rand < 80) grid[row, col] = validSymbols[rnd.Next(3, 6)];
+                    else if (rand < 92) grid[row, col] = validSymbols[rnd.Next(6, 9)];
+                    else if (rand < 97) grid[row, col] = SymbolType.Wild;
                     else grid[row, col] = SymbolType.Scatter;
                 }
             }
             if (inBonus)
             {
-                int extraWilds = rnd.Next(2, 6);
+                int extraWilds = rnd.Next(3, 7);
                 for (int i = 0; i < extraWilds; i++)
                 {
                     int r = rnd.Next(ROWS), c = rnd.Next(COLS);
@@ -249,7 +249,7 @@ namespace PiratesFortuneSlot
                 {
                     for (int col = 0; col < COLS; col++)
                     {
-                        if (rnd.Next(100) < 10 && symbols.Exists(s => s.Type == SymbolType.GoldCoin))
+                        if (rnd.Next(100) < 15)
                             grid[row, col] = SymbolType.GoldCoin;
                     }
                 }
@@ -258,7 +258,7 @@ namespace PiratesFortuneSlot
 
         private void tmrDrop_Tick(object sender, EventArgs e)
         {
-            const int dropSpeed = 120;
+            const int dropSpeed = 60;
             bool allDropped = true;
 
             for (int row = 0; row < ROWS; row++)
@@ -321,7 +321,7 @@ namespace PiratesFortuneSlot
                     if (!visited[row, col] && grid[row, col] != SymbolType.Empty && grid[row, col] != SymbolType.Scatter && grid[row, col] != SymbolType.GoldCoin)
                     {
                         List<Point> cluster = GetCluster(row, col, visited);
-                        if (cluster.Count >= 8)
+                        if (cluster.Count >= 5)
                         {
                             hasWin = true;
                             totalPayout += CalculatePayout(cluster);
@@ -424,8 +424,9 @@ namespace PiratesFortuneSlot
             var sym = symbols.Find(s => s.Type == type);
             if (sym == null) return 0;
             int size = cluster.Count;
-            if (size >= 12) return sym.Payouts[2];
-            if (size >= 10) return sym.Payouts[1];
+            if (size >= 10) return sym.Payouts[3];
+            if (size >= 8) return sym.Payouts[2];
+            if (size >= 6) return sym.Payouts[1];
             return sym.Payouts[0];
         }
 
@@ -456,12 +457,12 @@ namespace PiratesFortuneSlot
                 for (int row = 0; row <= writeRow; row++)
                 {
                     int rand = rnd.Next(100);
-                    if (rand < 40) grid[row, col] = (SymbolType)rnd.Next(0, 3);
-                    else if (rand < 70) grid[row, col] = (SymbolType)rnd.Next(3, 6);
-                    else if (rand < 90) grid[row, col] = (SymbolType)rnd.Next(6, 9);
-                    else if (rand < 95) grid[row, col] = SymbolType.Wild;
+                    if (rand < 50) grid[row, col] = (SymbolType)rnd.Next(0, 3);
+                    else if (rand < 80) grid[row, col] = (SymbolType)rnd.Next(3, 6);
+                    else if (rand < 92) grid[row, col] = (SymbolType)rnd.Next(6, 9);
+                    else if (rand < 97) grid[row, col] = SymbolType.Wild;
                     else grid[row, col] = SymbolType.Scatter;
-                    if (inBonus && rnd.Next(100) < 10 && symbols.Exists(s => s.Type == SymbolType.GoldCoin))
+                    if (inBonus && rnd.Next(100) < 15)
                         grid[row, col] = SymbolType.GoldCoin;
                 }
             }
