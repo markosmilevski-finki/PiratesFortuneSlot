@@ -29,27 +29,11 @@ namespace PiratesFortuneSlot
             }
         }
 
-        private List<Symbol> symbols = new List<Symbol>
-        {
-            new Symbol(SymbolType.Ruby, "Ruby.png", new double[] {0.25, 0.5, 5}),
-            new Symbol(SymbolType.Sapphire, "Sapphire.png", new double[] {0.25, 0.5, 5}),
-            new Symbol(SymbolType.Emerald, "Emerald.png", new double[] {0.5, 1, 8}),
-            new Symbol(SymbolType.RumBottle, "RumBottle.png", new double[] {1, 2, 10}),
-            new Symbol(SymbolType.Compass, "Compass.png", new double[] {1, 2, 12}),
-            new Symbol(SymbolType.Map, "Map.png", new double[] {2, 4, 15}),
-            new Symbol(SymbolType.Parrot, "Parrot.png", new double[] {5, 10, 25}),
-            new Symbol(SymbolType.PirateHat, "PirateHat.png", new double[] {10, 20, 50}),
-            new Symbol(SymbolType.Ship, "Ship.png", new double[] {15, 25, 100}),
-            new Symbol(SymbolType.Wild, "Wild.png", new double[] {0, 0, 0}),
-            new Symbol(SymbolType.Scatter, "Scatter.png", new double[] {0, 0, 0}),
-            new Symbol(SymbolType.GoldCoin, "GoldCoin.png", new double[] {0, 0, 0})
-        };
-
+        private List<Symbol> symbols = new List<Symbol>();
         private const int COLS = 5;
         private const int ROWS = 4;
         private SymbolType[,] grid = new SymbolType[ROWS, COLS];
         private PictureBox[,] pbGrid = new PictureBox[ROWS, COLS];
-
         private int balance = 1000;
         private int currentWin = 0;
         private int bet = 10;
@@ -58,41 +42,84 @@ namespace PiratesFortuneSlot
         private int bonusSpins = 0;
         private int bonusMultiplier = 1;
         private int collectedTreasures = 0;
-
         private SoundPlayer sndSpin, sndWin, sndBonus, sndExplosion, sndBackground;
-
         private int dropStep = 0;
         private int[,] finalYPositions = new int[ROWS, COLS];
 
         public Form1()
         {
             InitializeComponent();
-            LoadSounds();
-            InitializeGrid();
-            UpdateUI();
-            PlayBackgroundMusic();
+            this.DoubleBuffered = true;
         }
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            this.Size = new Size(1920, 1200);
+            this.Size = new Size(1280, 720);
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
+            this.MinimizeBox = false;
             this.BackgroundImageLayout = ImageLayout.Stretch;
 
-            lblBalance.Location = new Point(300, 1000);
-            lblBalance.Font = new Font("Arial", 16);
-            lblWin.Location = new Point(800, 1000);
-            lblWin.Font = new Font("Arial", 16);
-            nudBet.Location = new Point(1300, 1000);
-            nudBet.Font = new Font("Arial", 16);
-            nudBet.Size = new Size(120, 35);
-            btnSpin.Location = new Point(1600, 1000);
-            btnSpin.Font = new Font("Arial", 16);
-            btnSpin.Size = new Size(120, 45);
+            lblBalance.Location = new Point(150, 600);
+            lblBalance.Font = new Font("Arial", 12);
+            lblWin.Location = new Point(500, 600);
+            lblWin.Font = new Font("Arial", 12);
+            nudBet.Location = new Point(850, 600);
+            nudBet.Font = new Font("Arial", 12);
+            nudBet.Size = new Size(80, 25);
+            btnSpin.Location = new Point(1000, 600);
+            btnSpin.Font = new Font("Arial", 12);
+            btnSpin.Size = new Size(80, 30);
 
-            tmrDrop.Interval = 100;
+            tmrDrop.Interval = 50;
             tmrCascade.Interval = 500;
+
+            LoadSounds();
+            InitializeSymbols();
+            if (symbols.Count == 0)
+            {
+                MessageBox.Show("No symbols loaded. Check resource files.");
+                Close();
+                return;
+            }
+
+            InitializeGrid();
+            GenerateGrid();
+            UpdateGridDisplay();
+            UpdateUI();
+            PlayBackgroundMusic();
+        }
+
+        private void InitializeSymbols()
+        {
+            var symbolData = new[]
+            {
+                new { Type = SymbolType.Ruby, ImageName = "Ruby.png", Payouts = new double[] {0.25, 0.5, 5}},
+                new { Type = SymbolType.Sapphire, ImageName = "Sapphire.png", Payouts = new double[] {0.25, 0.5, 5}},
+                new { Type = SymbolType.Emerald, ImageName = "Emerald.png", Payouts = new double[] {0.5, 1, 8}},
+                new { Type = SymbolType.RumBottle, ImageName = "RumBottle.png", Payouts = new double[] {1, 2, 10}},
+                new { Type = SymbolType.Compass, ImageName = "Compass.png", Payouts = new double[] {1, 2, 12}},
+                new { Type = SymbolType.Map, ImageName = "Map.png", Payouts = new double[] {2, 4, 15}},
+                new { Type = SymbolType.Parrot, ImageName = "Parrot.png", Payouts = new double[] {5, 10, 25}},
+                new { Type = SymbolType.PirateHat, ImageName = "PirateHat.png", Payouts = new double[] {10, 20, 50}},
+                new { Type = SymbolType.Ship, ImageName = "Ship.png", Payouts = new double[] {15, 25, 100}},
+                new { Type = SymbolType.Wild, ImageName = "Wild.png", Payouts = new double[] {0, 0, 0}},
+                new { Type = SymbolType.Scatter, ImageName = "Scatter.png", Payouts = new double[] {0, 0, 0}},
+                new { Type = SymbolType.GoldCoin, ImageName = "GoldCoin.png", Payouts = new double[] {0, 0, 0}}
+            };
+
+            foreach (var data in symbolData)
+            {
+                var image = GetEmbeddedImage(data.ImageName);
+                if (image != null)
+                {
+                    symbols.Add(new Symbol(data.Type, data.ImageName, data.Payouts));
+                }
+                else
+                {
+                    MessageBox.Show($"Failed to load image: {data.ImageName}");
+                }
+            }
         }
 
         private void LoadSounds()
@@ -107,26 +134,39 @@ namespace PiratesFortuneSlot
         private static Stream GetEmbeddedResourceStream(string name)
         {
             var assembly = Assembly.GetExecutingAssembly();
-            return assembly.GetManifestResourceStream("PiratesFortuneSlot.Resources." + name);
+            string resourceName = "PiratesFortuneSlot.Resources." + name;
+            var stream = assembly.GetManifestResourceStream(resourceName);
+            if (stream == null)
+            {
+                MessageBox.Show($"Sound resource not found: {resourceName}");
+            }
+            return stream;
         }
 
         private void PlayBackgroundMusic()
         {
-            sndBackground.PlayLooping();
+            if (sndBackground != null)
+                sndBackground.PlayLooping();
         }
 
         private static Image GetEmbeddedImage(string name)
         {
             var assembly = Assembly.GetExecutingAssembly();
-            using (var stream = assembly.GetManifestResourceStream("PiratesFortuneSlot.Resources." + name))
+            string resourceName = "PiratesFortuneSlot.Resources." + name;
+            using (var stream = assembly.GetManifestResourceStream(resourceName))
             {
+                if (stream == null)
+                {
+                    MessageBox.Show($"Image resource not found: {resourceName}");
+                    return null;
+                }
                 return Image.FromStream(stream);
             }
         }
 
         private void InitializeGrid()
         {
-            int startX = 440, startY = 100, size = 200, spacing = 210;
+            int startX = 200, startY = 50, size = 120, spacing = 130;
             for (int row = 0; row < ROWS; row++)
             {
                 for (int col = 0; col < COLS; col++)
@@ -152,7 +192,7 @@ namespace PiratesFortuneSlot
             currentWin = 0;
             if (!inBonus) bonusMultiplier = 1;
 
-            sndSpin.Play();
+            sndSpin?.Play();
             GenerateGrid();
             AnimateDrop();
             tmrDrop.Start();
@@ -165,12 +205,11 @@ namespace PiratesFortuneSlot
             {
                 for (int col = 0; col < COLS; col++)
                 {
-                    pbGrid[row, col].Location = new Point(pbGrid[row, col].Left, -800);
+                    pbGrid[row, col].Location = new Point(pbGrid[row, col].Left, -480);
                     pbGrid[row, col].Image = null;
-                    finalYPositions[row, col] = 100 + row * 210;
+                    finalYPositions[row, col] = 50 + row * 130;
                 }
             }
-            tmrDrop.Start();
         }
 
         private void UpdateUI()
@@ -182,14 +221,18 @@ namespace PiratesFortuneSlot
 
         private void GenerateGrid()
         {
+            SymbolType[] validSymbols = new SymbolType[] { SymbolType.Ruby, SymbolType.Sapphire, SymbolType.Emerald,
+                                                          SymbolType.RumBottle, SymbolType.Compass, SymbolType.Map,
+                                                          SymbolType.Parrot, SymbolType.PirateHat, SymbolType.Ship,
+                                                          SymbolType.Wild, SymbolType.Scatter, SymbolType.GoldCoin };
             for (int row = 0; row < ROWS; row++)
             {
                 for (int col = 0; col < COLS; col++)
                 {
                     int rand = rnd.Next(100);
-                    if (rand < 40) grid[row, col] = (SymbolType)rnd.Next(0, 3);
-                    else if (rand < 70) grid[row, col] = (SymbolType)rnd.Next(3, 6);
-                    else if (rand < 90) grid[row, col] = (SymbolType)rnd.Next(6, 9);
+                    if (rand < 40) grid[row, col] = validSymbols[rnd.Next(0, 3)];
+                    else if (rand < 70) grid[row, col] = validSymbols[rnd.Next(3, 6)];
+                    else if (rand < 90) grid[row, col] = validSymbols[rnd.Next(6, 9)];
                     else if (rand < 95) grid[row, col] = SymbolType.Wild;
                     else grid[row, col] = SymbolType.Scatter;
                 }
@@ -206,7 +249,8 @@ namespace PiratesFortuneSlot
                 {
                     for (int col = 0; col < COLS; col++)
                     {
-                        if (rnd.Next(100) < 10) grid[row, col] = SymbolType.GoldCoin;
+                        if (rnd.Next(100) < 10 && symbols.Exists(s => s.Type == SymbolType.GoldCoin))
+                            grid[row, col] = SymbolType.GoldCoin;
                     }
                 }
             }
@@ -214,7 +258,7 @@ namespace PiratesFortuneSlot
 
         private void tmrDrop_Tick(object sender, EventArgs e)
         {
-            const int dropSpeed = 500;
+            const int dropSpeed = 120;
             bool allDropped = true;
 
             for (int row = 0; row < ROWS; row++)
@@ -224,12 +268,15 @@ namespace PiratesFortuneSlot
                     int targetY = finalYPositions[row, col];
                     if (pbGrid[row, col].Top < targetY)
                     {
-                        pbGrid[row, col].Location = new Point(pbGrid[row, col].Left, pbGrid[row, col].Top + dropSpeed);
+                        int newTop = pbGrid[row, col].Top + dropSpeed;
+                        if (newTop > targetY) newTop = targetY;
+                        pbGrid[row, col].Location = new Point(pbGrid[row, col].Left, newTop);
+                        if (newTop == targetY)
+                        {
+                            var sym = symbols.Find(s => s.Type == grid[row, col]);
+                            pbGrid[row, col].Image = sym?.Image;
+                        }
                         allDropped = false;
-                    }
-                    else
-                    {
-                        pbGrid[row, col].Location = new Point(pbGrid[row, col].Left, targetY);
                     }
                 }
             }
@@ -241,6 +288,7 @@ namespace PiratesFortuneSlot
                 UpdateGridDisplay();
                 CheckWinsAndCascades();
             }
+            this.Invalidate();
         }
 
         private void UpdateGridDisplay()
@@ -253,6 +301,7 @@ namespace PiratesFortuneSlot
                     pbGrid[row, col].Image = sym?.Image;
                 }
             }
+            this.Invalidate();
         }
 
         private void CheckWinsAndCascades()
@@ -296,8 +345,8 @@ namespace PiratesFortuneSlot
 
             if (hasWin)
             {
-                sndWin.Play();
-                sndExplosion.Play();
+                sndWin?.Play();
+                sndExplosion?.Play();
                 currentWin += (int)(totalPayout * bet * bonusMultiplier);
                 if (inBonus) bonusMultiplier++;
                 tmrCascade.Start();
@@ -329,7 +378,7 @@ namespace PiratesFortuneSlot
 
         private void EnterBonus(int scatters)
         {
-            sndBonus.Play();
+            sndBonus?.Play();
             inBonus = true;
             bonusSpins = 10 + (scatters > 3 ? 5 * (scatters - 3) : 0);
             bonusMultiplier = 1;
@@ -373,6 +422,7 @@ namespace PiratesFortuneSlot
         {
             SymbolType type = grid[cluster[0].Y, cluster[0].X];
             var sym = symbols.Find(s => s.Type == type);
+            if (sym == null) return 0;
             int size = cluster.Count;
             if (size >= 12) return sym.Payouts[2];
             if (size >= 10) return sym.Payouts[1];
@@ -386,7 +436,7 @@ namespace PiratesFortuneSlot
                 grid[p.Y, p.X] = SymbolType.Empty;
                 pbGrid[p.Y, p.X].Image = null;
             }
-            sndExplosion.Play();
+            sndExplosion?.Play();
         }
 
         private void CascadeSymbols()
@@ -411,7 +461,8 @@ namespace PiratesFortuneSlot
                     else if (rand < 90) grid[row, col] = (SymbolType)rnd.Next(6, 9);
                     else if (rand < 95) grid[row, col] = SymbolType.Wild;
                     else grid[row, col] = SymbolType.Scatter;
-                    if (inBonus && rnd.Next(100) < 10) grid[row, col] = SymbolType.GoldCoin;
+                    if (inBonus && rnd.Next(100) < 10 && symbols.Exists(s => s.Type == SymbolType.GoldCoin))
+                        grid[row, col] = SymbolType.GoldCoin;
                 }
             }
         }
