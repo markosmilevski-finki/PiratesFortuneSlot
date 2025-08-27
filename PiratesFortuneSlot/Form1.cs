@@ -133,18 +133,18 @@ namespace PiratesFortuneSlot
         {
             var symbolData = new[]
             {
-                new { Type = SymbolType.Ruby, ImageName = "Ruby.png", Payouts = new double[] {0.2, 0.4, 0.8, 2}},
-                new { Type = SymbolType.Sapphire, ImageName = "Sapphire.png", Payouts = new double[] {0.2, 0.4, 0.8, 2}},
-                new { Type = SymbolType.Emerald, ImageName = "Emerald.png", Payouts = new double[] {0.3, 0.6, 1.2, 3}},
-                new { Type = SymbolType.RumBottle, ImageName = "RumBottle.png", Payouts = new double[] {0.5, 1, 2, 5}},
-                new { Type = SymbolType.Compass, ImageName = "Compass.png", Payouts = new double[] {0.5, 1, 2, 6}},
-                new { Type = SymbolType.Map, ImageName = "Map.png", Payouts = new double[] {1, 2, 4, 8}},
-                new { Type = SymbolType.Parrot, ImageName = "Parrot.png", Payouts = new double[] {2, 4, 8, 15}},
-                new { Type = SymbolType.PirateHat, ImageName = "PirateHat.png", Payouts = new double[] {3, 6, 12, 20}},
-                new { Type = SymbolType.Ship, ImageName = "Ship.png", Payouts = new double[] {5, 10, 20, 40}},
-                new { Type = SymbolType.Wild, ImageName = "Wild.png", Payouts = new double[] {0, 0, 0, 0}},
-                new { Type = SymbolType.Scatter, ImageName = "Scatter.png", Payouts = new double[] {0, 0, 0, 0}},
-                new { Type = SymbolType.GoldCoin, ImageName = "GoldCoin.png", Payouts = new double[] {0, 0, 0, 0}}
+                new { Type = SymbolType.Ruby, ImageName = "Ruby.png", Payouts = new double[] {50, 75, 100, 150, 200, 250, 300, 350, 400, 450, 500, 600, 700, 800, 900, 1000}},
+                new { Type = SymbolType.Sapphire, ImageName = "Sapphire.png", Payouts = new double[] {45, 67.5, 90, 135, 180, 225, 270, 315, 360, 405, 450, 540, 630, 720, 810, 900}},
+                new { Type = SymbolType.Emerald, ImageName = "Emerald.png", Payouts = new double[] {40, 60, 80, 120, 160, 200, 240, 280, 320, 360, 400, 480, 560, 640, 720, 800}},
+                new { Type = SymbolType.RumBottle, ImageName = "RumBottle.png", Payouts = new double[] {10, 15, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200}},
+                new { Type = SymbolType.Compass, ImageName = "Compass.png", Payouts = new double[] {8, 12, 16, 24, 32, 40, 48, 56, 64, 72, 80, 96, 112, 128, 144, 160}},
+                new { Type = SymbolType.Map, ImageName = "Map.png", Payouts = new double[] {6, 9, 12, 18, 24, 30, 36, 42, 48, 54, 60, 72, 84, 96, 108, 120}},
+                new { Type = SymbolType.Parrot, ImageName = "Parrot.png", Payouts = new double[] {4, 6, 8, 12, 16, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72, 80}},
+                new { Type = SymbolType.PirateHat, ImageName = "PirateHat.png", Payouts = new double[] {3, 4.5, 6, 9, 12, 15, 18, 21, 24, 27, 30, 36, 42, 48, 54, 60}},
+                new { Type = SymbolType.Ship, ImageName = "Ship.png", Payouts = new double[] {2, 3, 4, 6, 8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40}},
+                new { Type = SymbolType.Wild, ImageName = "Wild.png", Payouts = new double[] {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
+                new { Type = SymbolType.Scatter, ImageName = "Scatter.png", Payouts = new double[] {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
+                new { Type = SymbolType.GoldCoin, ImageName = "GoldCoin.png", Payouts = new double[] {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}}
             };
 
             foreach (var data in symbolData)
@@ -269,20 +269,27 @@ namespace PiratesFortuneSlot
 
         private void GenerateGrid()
         {
+            double[] probabilities = { 2.8, 4.2, 5.7, 7.1, 8.5, 9.9, 11.4, 12.8, 14.2, 2.0, 2.0, 2.0 };
             SymbolType[] validSymbols = new SymbolType[] { SymbolType.Ruby, SymbolType.Sapphire, SymbolType.Emerald,
                                                           SymbolType.RumBottle, SymbolType.Compass, SymbolType.Map,
                                                           SymbolType.Parrot, SymbolType.PirateHat, SymbolType.Ship,
                                                           SymbolType.Wild, SymbolType.Scatter, SymbolType.GoldCoin };
+
             for (int row = 0; row < ROWS; row++)
             {
                 for (int col = 0; col < COLS; col++)
                 {
                     int rand = rnd.Next(100);
-                    if (rand < 50) grid[row, col] = validSymbols[rnd.Next(0, 3)];
-                    else if (rand < 80) grid[row, col] = validSymbols[rnd.Next(3, 6)];
-                    else if (rand < 92) grid[row, col] = validSymbols[rnd.Next(6, 9)];
-                    else if (rand < 97) grid[row, col] = SymbolType.Wild;
-                    else grid[row, col] = SymbolType.Scatter;
+                    double cumProb = 0;
+                    for (int i = 0; i < probabilities.Length; i++)
+                    {
+                        cumProb += probabilities[i];
+                        if (rand < cumProb)
+                        {
+                            grid[row, col] = validSymbols[i];
+                            break;
+                        }
+                    }
                 }
             }
             if (inBonus)
@@ -297,7 +304,7 @@ namespace PiratesFortuneSlot
                 {
                     for (int col = 0; col < COLS; col++)
                     {
-                        if (rnd.Next(100) < 5)
+                        if (rnd.Next(100) < 1)
                             grid[row, col] = SymbolType.GoldCoin;
                     }
                 }
@@ -499,11 +506,9 @@ namespace PiratesFortuneSlot
                 return 0;
             }
             int size = cluster.Count;
-            double payout = 0;
-            if (size >= 10) payout = sym.Payouts[3];
-            else if (size >= 8) payout = sym.Payouts[2];
-            else if (size >= 6) payout = sym.Payouts[1];
-            else if (size >= 5) payout = sym.Payouts[0];
+            if (size < 5) return 0;
+            int index = Math.Min(size - 5, 15);
+            double payout = sym.Payouts[index];
             return payout;
         }
 
@@ -521,26 +526,64 @@ namespace PiratesFortuneSlot
         {
             for (int col = 0; col < COLS; col++)
             {
-                int writeRow = ROWS - 1;
-                for (int readRow = ROWS - 1; readRow >= 0; readRow--)
+                List<SymbolType> nonEmptySymbols = new List<SymbolType>();
+                for (int row = 0; row < ROWS; row++)
                 {
-                    if (grid[readRow, col] != SymbolType.Empty)
+                    if (grid[row, col] != SymbolType.Empty)
                     {
-                        grid[writeRow, col] = grid[readRow, col];
-                        if (writeRow != readRow) grid[readRow, col] = SymbolType.Empty;
-                        writeRow--;
+                        nonEmptySymbols.Add(grid[row, col]);
                     }
                 }
-                for (int row = 0; row <= writeRow; row++)
+
+                for (int row = ROWS - 1; row >= 0; row--)
                 {
-                    int rand = rnd.Next(100);
-                    if (rand < 50) grid[row, col] = (SymbolType)rnd.Next(0, 3);
-                    else if (rand < 80) grid[row, col] = (SymbolType)rnd.Next(3, 6);
-                    else if (rand < 92) grid[row, col] = (SymbolType)rnd.Next(6, 9);
-                    else if (rand < 97) grid[row, col] = SymbolType.Wild;
-                    else grid[row, col] = SymbolType.Scatter;
-                    if (inBonus && rnd.Next(100) < 5)
-                        grid[row, col] = SymbolType.GoldCoin;
+                    if (nonEmptySymbols.Count > 0)
+                    {
+                        grid[row, col] = nonEmptySymbols[nonEmptySymbols.Count - 1];
+                        nonEmptySymbols.RemoveAt(nonEmptySymbols.Count - 1);
+                    }
+                    else
+                    {
+                        grid[row, col] = SymbolType.Empty;
+                    }
+                }
+            }
+
+            double[] probabilities = { 2.8, 4.2, 5.7, 7.1, 8.5, 9.9, 11.4, 12.8, 14.2, 2.0, 2.0, 2.0 };
+            SymbolType[] validSymbols = { SymbolType.Ruby, SymbolType.Sapphire, SymbolType.Emerald,
+                                         SymbolType.RumBottle, SymbolType.Compass, SymbolType.Map,
+                                         SymbolType.Parrot, SymbolType.PirateHat, SymbolType.Ship,
+                                         SymbolType.Wild, SymbolType.Scatter, SymbolType.GoldCoin };
+
+            for (int row = 0; row < ROWS; row++)
+            {
+                for (int col = 0; col < COLS; col++)
+                {
+                    if (grid[row, col] == SymbolType.Empty)
+                    {
+                        int rand = rnd.Next(100);
+                        double cumProb = 0;
+                        for (int i = 0; i < probabilities.Length; i++)
+                        {
+                            cumProb += probabilities[i];
+                            if (rand < cumProb)
+                            {
+                                grid[row, col] = validSymbols[i];
+                                break;
+                            }
+                        }
+                        if (inBonus && rnd.Next(100) < 1)
+                            grid[row, col] = SymbolType.GoldCoin;
+                    }
+                }
+            }
+
+            for (int row = 0; row < ROWS; row++)
+            {
+                for (int col = 0; col < COLS; col++)
+                {
+                    var sym = symbols.Find(s => s.Type == grid[row, col]);
+                    pbGrid[row, col].Image = sym?.Image ?? null;
                 }
             }
         }
