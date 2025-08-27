@@ -36,20 +36,61 @@ namespace PiratesFortuneSlot
         private PictureBox[,] pbGrid = new PictureBox[ROWS, COLS];
         private int balance = 1000;
         private int currentWin = 0;
+        private int totalSpinWin = 0;
         private int bet = 10;
         private Random rnd = new Random();
         private bool inBonus = false;
         private int bonusSpins = 0;
         private int bonusMultiplier = 1;
         private int collectedTreasures = 0;
+        private int extraSpinsAdded = 0;
         private SoundPlayer sndSpin, sndWin, sndBonus, sndExplosion, sndBackground;
         private int dropStep = 0;
         private int[,] finalYPositions = new int[ROWS, COLS];
+        private Label lblBonusSpins;
+        private Label lblMultiplier;
+        private Timer tmrWinDisplay;
+        private Point lblWinInitialPos;
 
         public Form1()
         {
             InitializeComponent();
             this.DoubleBuffered = true;
+
+            lblWin.Location = new Point(640 - 100, 360);
+            lblWin.Font = new Font("Arial", 24, FontStyle.Bold);
+            lblWin.ForeColor = Color.FromArgb(255, 215, 0);
+            lblWin.BackColor = Color.Transparent;
+            lblWin.Size = new Size(200, 40);
+            lblWin.TextAlign = ContentAlignment.MiddleCenter;
+            lblWin.Visible = false;
+            lblWinInitialPos = lblWin.Location;
+
+            lblBonusSpins = new Label
+            {
+                Location = new Point(500, 630),
+                Font = new Font("Arial", 12),
+                Size = new Size(150, 25),
+                Text = "Bonus Spins: 0",
+                Visible = false
+            };
+            Controls.Add(lblBonusSpins);
+
+            lblMultiplier = new Label
+            {
+                Location = new Point(500, 660),
+                Font = new Font("Arial", 12),
+                Size = new Size(150, 25),
+                Text = "Multiplier: 1x",
+                Visible = false
+            };
+            Controls.Add(lblMultiplier);
+
+            tmrWinDisplay = new Timer
+            {
+                Interval = 2000
+            };
+            tmrWinDisplay.Tick += tmrWinDisplay_Tick;
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -62,8 +103,6 @@ namespace PiratesFortuneSlot
 
             lblBalance.Location = new Point(150, 600);
             lblBalance.Font = new Font("Arial", 12);
-            lblWin.Location = new Point(500, 600);
-            lblWin.Font = new Font("Arial", 12);
             nudBet.Location = new Point(850, 600);
             nudBet.Font = new Font("Arial", 12);
             nudBet.Size = new Size(80, 25);
@@ -126,7 +165,7 @@ namespace PiratesFortuneSlot
         {
             sndSpin = new SoundPlayer(GetEmbeddedResourceStream("Spin.wav"));
             sndWin = new SoundPlayer(GetEmbeddedResourceStream("Win.wav"));
-            sndBonus = new SoundPlayer(GetEmbeddedResourceStream("Explosion.wav"));
+            sndBonus = new SoundPlayer(GetEmbeddedResourceStream("Win.wav"));
             sndExplosion = new SoundPlayer(GetEmbeddedResourceStream("Explosion.wav"));
             sndBackground = new SoundPlayer(GetEmbeddedResourceStream("BackgroundMusic.wav"));
         }
@@ -185,10 +224,13 @@ namespace PiratesFortuneSlot
 
         private void btnSpin_Click(object sender, EventArgs e)
         {
-            bet = (int)nudBet.Value;
-            if (balance < bet) { MessageBox.Show("Insufficient balance!"); return; }
-
-            balance -= bet;
+            if (!inBonus)
+            {
+                bet = (int)nudBet.Value;
+                if (balance < bet) { MessageBox.Show("Insufficient balance!"); return; }
+                balance -= bet;
+                totalSpinWin = 0;
+            }
             currentWin = 0;
             if (!inBonus) bonusMultiplier = 1;
 
@@ -215,8 +257,14 @@ namespace PiratesFortuneSlot
         private void UpdateUI()
         {
             lblBalance.Text = $"Balance: {balance}";
-            lblWin.Text = $"Win: {currentWin}";
+            lblWin.Text = $"Win: {totalSpinWin}";
+            lblWin.Location = lblWinInitialPos;
             nudBet.Value = bet;
+            lblBonusSpins.Text = $"Bonus Spins: {bonusSpins}";
+            lblMultiplier.Text = $"Multiplier: {bonusMultiplier}x";
+            lblBonusSpins.Visible = inBonus;
+            lblMultiplier.Visible = inBonus;
+            this.Invalidate();
         }
 
         private void GenerateGrid()
@@ -249,7 +297,7 @@ namespace PiratesFortuneSlot
                 {
                     for (int col = 0; col < COLS; col++)
                     {
-                        if (rnd.Next(100) < 15)
+                        if (rnd.Next(100) < 5)
                             grid[row, col] = SymbolType.GoldCoin;
                     }
                 }
@@ -297,6 +345,7 @@ namespace PiratesFortuneSlot
             {
                 for (int col = 0; col < COLS; col++)
                 {
+                    pbGrid[row, col].Image = null;
                     var sym = symbols.Find(s => s.Type == grid[row, col]);
                     pbGrid[row, col].Image = sym?.Image;
                 }
@@ -324,7 +373,8 @@ namespace PiratesFortuneSlot
                         if (cluster.Count >= 5)
                         {
                             hasWin = true;
-                            totalPayout += CalculatePayout(cluster);
+                            double payout = CalculatePayout(cluster);
+                            totalPayout += payout;
                             ExplodeCluster(cluster);
                         }
                     }
@@ -334,11 +384,11 @@ namespace PiratesFortuneSlot
             if (inBonus && goldCoinCount > 0)
             {
                 collectedTreasures += goldCoinCount;
-                if (collectedTreasures >= 5)
+                if (collectedTreasures >= 5 && extraSpinsAdded < 5)
                 {
                     bonusMultiplier++;
                     bonusSpins += 2;
-                    collectedTreasures = 0;
+                    extraSpinsAdded += 2;
                     MessageBox.Show("Treasure collected! +1 Multiplier, +2 Spins!");
                 }
             }
@@ -347,8 +397,11 @@ namespace PiratesFortuneSlot
             {
                 sndWin?.Play();
                 sndExplosion?.Play();
-                currentWin += (int)(totalPayout * bet * bonusMultiplier);
-                if (inBonus) bonusMultiplier++;
+                currentWin = (int)(totalPayout * bet * bonusMultiplier);
+                totalSpinWin += currentWin;
+                lblWin.Text = $"Win: {totalSpinWin}";
+                lblWin.Visible = true;
+                tmrWinDisplay.Start();
                 tmrCascade.Start();
             }
             else
@@ -366,14 +419,30 @@ namespace PiratesFortuneSlot
                     }
                     else
                     {
+                        sndWin.Play();
                         inBonus = false;
-                        MessageBox.Show($"Bonus over! Total win: {currentWin}");
+                        extraSpinsAdded = 0;
+                        balance += totalSpinWin;
+                        MessageBox.Show($"Bonus over! Total win: {totalSpinWin}");
+                        totalSpinWin = 0;
+                        lblWin.Visible = false;
+                        UpdateUI();
                     }
                 }
-                balance += currentWin;
-                currentWin = 0;
-                UpdateUI();
+                else
+                {
+                    balance += totalSpinWin;
+                    totalSpinWin = 0;
+                    lblWin.Visible = false;
+                    UpdateUI();
+                }
             }
+        }
+
+        private void tmrWinDisplay_Tick(object sender, EventArgs e)
+        {
+            tmrWinDisplay.Stop();
+            lblWin.Visible = false;
         }
 
         private void EnterBonus(int scatters)
@@ -383,6 +452,7 @@ namespace PiratesFortuneSlot
             bonusSpins = 10 + (scatters > 3 ? 5 * (scatters - 3) : 0);
             bonusMultiplier = 1;
             collectedTreasures = 0;
+            extraSpinsAdded = 0;
             MessageBox.Show("Ahoy! Treasure Hunt Bonus Activated!");
             btnSpin_Click(null, null);
         }
@@ -391,7 +461,8 @@ namespace PiratesFortuneSlot
         {
             List<Point> cluster = new List<Point>();
             SymbolType type = grid[startRow, startCol];
-            if (type == SymbolType.Wild) return cluster;
+            if (type == SymbolType.Wild || type == SymbolType.Empty || type == SymbolType.Scatter || type == SymbolType.GoldCoin)
+                return cluster;
 
             Stack<Point> stack = new Stack<Point>();
             stack.Push(new Point(startCol, startRow));
@@ -420,14 +491,20 @@ namespace PiratesFortuneSlot
 
         private double CalculatePayout(List<Point> cluster)
         {
+            if (cluster.Count == 0) return 0;
             SymbolType type = grid[cluster[0].Y, cluster[0].X];
             var sym = symbols.Find(s => s.Type == type);
-            if (sym == null) return 0;
+            if (sym == null)
+            {
+                return 0;
+            }
             int size = cluster.Count;
-            if (size >= 10) return sym.Payouts[3];
-            if (size >= 8) return sym.Payouts[2];
-            if (size >= 6) return sym.Payouts[1];
-            return sym.Payouts[0];
+            double payout = 0;
+            if (size >= 10) payout = sym.Payouts[3];
+            else if (size >= 8) payout = sym.Payouts[2];
+            else if (size >= 6) payout = sym.Payouts[1];
+            else if (size >= 5) payout = sym.Payouts[0];
+            return payout;
         }
 
         private void ExplodeCluster(List<Point> cluster)
@@ -462,7 +539,7 @@ namespace PiratesFortuneSlot
                     else if (rand < 92) grid[row, col] = (SymbolType)rnd.Next(6, 9);
                     else if (rand < 97) grid[row, col] = SymbolType.Wild;
                     else grid[row, col] = SymbolType.Scatter;
-                    if (inBonus && rnd.Next(100) < 15)
+                    if (inBonus && rnd.Next(100) < 5)
                         grid[row, col] = SymbolType.GoldCoin;
                 }
             }
