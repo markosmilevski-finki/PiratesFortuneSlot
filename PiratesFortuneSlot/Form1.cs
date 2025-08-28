@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Media;
-using System.Reflection;
 using System.Windows.Forms;
 using System.IO;
 using NAudio.Wave;
@@ -11,31 +10,11 @@ namespace PiratesFortuneSlot
 {
     public partial class Form1 : Form
     {
-        private enum SymbolType
-        {
-            Ruby, Sapphire, Emerald, RumBottle, Compass, Map, Parrot, PirateHat, Ship, Wild, Scatter, GoldCoin, Empty
-        }
+        private readonly SymbolManager _symbolManager;
+        private readonly GridManager _gridManager;
+        private readonly UIManager _uiManager;
+        private readonly AudioManager _audioManager;
 
-        private class Symbol
-        {
-            public SymbolType Type { get; set; }
-            public Image Image { get; set; }
-            public double[] Payouts { get; set; }
-
-            public Symbol(SymbolType type, string imageName, double[] payouts)
-            {
-                Type = type;
-                Image = GetEmbeddedImage(imageName);
-                Payouts = payouts;
-            }
-        }
-
-        private List<Symbol> symbols = new List<Symbol>();
-        private const int COLS = 5;
-        private const int ROWS = 4;
-        private SymbolType[,] grid = new SymbolType[ROWS, COLS];
-        private PictureBox[,] pbGrid = new PictureBox[ROWS, COLS];
-        private Point[,] gridCenters;
         private double balance = 1000.00;
         private double currentWin = 0.00;
         private double totalSpinWin = 0.00;
@@ -53,22 +32,6 @@ namespace PiratesFortuneSlot
         private bool isSpinComplete = true;
         private bool bonusTriggeredThisSpin = false;
         private bool goldCoinsCountedThisSpin = false;
-        private IWavePlayer sndBackgroundPlayer;
-        private WaveFileReader sndBackgroundReader;
-        private List<IWavePlayer> soundPlayers = new List<IWavePlayer>();
-        private List<WaveFileReader> soundReaders = new List<WaveFileReader>();
-        private int[,] finalYPositions = new int[ROWS, COLS];
-        private Label lblBonusSpins;
-        private Label lblMultiplier;
-        private Label lblGoldCoins;
-        private Label lblBiggestWin;
-        private Label lblBiggestMultiplier;
-        private Button btnAutoSpin;
-        private Timer tmrWinDisplay;
-        private Timer tmrBaseWinDisplay;
-        private Timer tmrAutoSpin;
-        private Timer tmrExplode;
-        private Timer tmrCascadeDrop;
         private double baseWin;
         private bool closingForm = false;
         private List<Point> currentExplodingCluster;
@@ -81,111 +44,18 @@ namespace PiratesFortuneSlot
             InitializeComponent();
             this.DoubleBuffered = true;
 
-            lblWin.Location = new Point(450, 600);
-            lblWin.Font = new Font("Arial", 24, FontStyle.Bold);
-            lblWin.ForeColor = Color.FromArgb(255, 215, 0);
-            lblWin.BackColor = Color.Black;
-            lblWin.Size = new Size(200, 40);
-            lblWin.TextAlign = ContentAlignment.MiddleCenter;
-            lblWin.Visible = false;
+            _symbolManager = new SymbolManager();
+            _gridManager = new GridManager(this, _symbolManager);
+            _uiManager = new UIManager(this);
+            _audioManager = new AudioManager();
 
-            lblBonusSpins = new Label
-            {
-                Location = new Point(25, 570),
-                Font = new Font("Arial", 12, FontStyle.Bold),
-                Size = new Size(150, 25),
-                Text = "Bonus Spins: 0",
-                ForeColor = Color.White,
-                BackColor = Color.Transparent,
-                Visible = false
-            };
-            Controls.Add(lblBonusSpins);
-
-            lblMultiplier = new Label
-            {
-                Location = new Point(25, 540),
-                Font = new Font("Arial", 12, FontStyle.Bold),
-                Size = new Size(150, 25),
-                Text = "Multiplier: 1x",
-                ForeColor = Color.White,
-                BackColor = Color.Transparent,
-                Visible = false
-            };
-            Controls.Add(lblMultiplier);
-
-            lblGoldCoins = new Label
-            {
-                Location = new Point(25, 600),
-                Font = new Font("Arial", 12, FontStyle.Bold),
-                Size = new Size(150, 25),
-                Text = "Gold Coins: 0/3",
-                ForeColor = Color.White,
-                BackColor = Color.Transparent,
-                Visible = false
-            };
-            Controls.Add(lblGoldCoins);
-
-            lblBiggestWin = new Label
-            {
-                Location = new Point(900, 250),
-                Font = new Font("Arial", 12, FontStyle.Bold),
-                Size = new Size(250, 25),
-                Text = "Biggest Win: 0.00",
-                ForeColor = Color.White,
-                BackColor = Color.Transparent
-            };
-            Controls.Add(lblBiggestWin);
-
-            lblBiggestMultiplier = new Label
-            {
-                Location = new Point(900, 200),
-                Font = new Font("Arial", 12, FontStyle.Bold),
-                Size = new Size(200, 25),
-                Text = "Biggest Multiplier: 1x",
-                ForeColor = Color.White,
-                BackColor = Color.Transparent
-            };
-            Controls.Add(lblBiggestMultiplier);
-
-            btnAutoSpin = new Button
-            {
-                Location = new Point(1100, 600),
-                Font = new Font("Arial", 12),
-                Size = new Size(80, 30),
-                Text = "Auto Spin"
-            };
-            btnAutoSpin.Click += btnAutoSpin_Click;
-            Controls.Add(btnAutoSpin);
-
-            tmrWinDisplay = new Timer
-            {
-                Interval = 2000
-            };
-            tmrWinDisplay.Tick += tmrWinDisplay_Tick;
-
-            tmrBaseWinDisplay = new Timer
-            {
-                Interval = 2000
-            };
-            tmrBaseWinDisplay.Tick += tmrBaseWinDisplay_Tick;
-
-            tmrAutoSpin = new Timer
-            {
-                Interval = 1500
-            };
-            tmrAutoSpin.Tick += tmrAutoSpin_Tick;
-
-            tmrExplode = new Timer
-            {
-                Interval = 500
-            };
-            tmrExplode.Tick += tmrExplode_Tick;
-
-            tmrCascadeDrop = new Timer
-            {
-                Interval = 50
-            };
-            tmrCascadeDrop.Tick += tmrCascadeDrop_Tick;
+            _uiManager.InitializeUI();
+            _uiManager.btnAutoSpin.Click += btnAutoSpin_Click;
+            _uiManager.tmrWinDisplay.Tick += tmrWinDisplay_Tick;
+            _uiManager.tmrBaseWinDisplay.Tick += tmrBaseWinDisplay_Tick;
+            _uiManager.tmrAutoSpin.Tick += tmrAutoSpin_Tick;
+            _uiManager.tmrExplode.Tick += tmrExplode_Tick;
+            _uiManager.tmrCascadeDrop.Tick += tmrCascadeDrop_Tick;
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -196,7 +66,7 @@ namespace PiratesFortuneSlot
             this.MinimizeBox = false;
             this.BackgroundImageLayout = ImageLayout.Stretch;
 
-            UpdateBackgroundImage();
+            _uiManager.UpdateBackgroundImage(inBonus);
 
             lblBalance.Location = new Point(25, 630);
             lblBalance.Font = new Font("Arial", 12, FontStyle.Bold);
@@ -217,232 +87,20 @@ namespace PiratesFortuneSlot
             tmrDrop.Interval = 50;
             tmrCascade.Interval = 500;
 
-            LoadSounds();
-            InitializeSymbols();
-            if (symbols.Count == 0)
+            _audioManager.LoadSounds();
+            _symbolManager.InitializeSymbols();
+            if (_symbolManager.Symbols.Count == 0)
             {
                 MessageBox.Show("No symbols loaded. Check resource files.");
                 Close();
                 return;
             }
 
-            gridCenters = GetGridCenterCoordinates();
-            InitializeGrid();
-            GenerateGrid();
-            UpdateGridDisplay();
-            UpdateUI();
-            PlayBackgroundMusic("BackgroundMusic.wav");
-        }
-
-        private Point[,] GetGridCenterCoordinates()
-        {
-            Point[,] centers = new Point[ROWS, COLS];
-            int startX = 200, startY = 50, spacing = 130, size = 100;
-
-            for (int row = 0; row < ROWS; row++)
-            {
-                for (int col = 0; col < COLS; col++)
-                {
-                    int centerX = startX + col * spacing + size / 2;
-                    int centerY = startY + row * spacing + size / 2;
-                    centers[row, col] = new Point(centerX, centerY);
-                }
-                if (row > 0)
-                {
-                    startY -= 10;
-                }
-                if (row == 2) startX += 5;
-            }
-            return centers;
-        }
-
-        private void InitializeSymbols()
-        {
-            var symbolData = new[]
-            {
-                new { Type = SymbolType.Ruby, ImageName = "Ruby.png", Payouts = new double[] { 22.40, 44.80, 89.60, 179.20, 358.40, 716.80, 1433.60, 2867.20, 5734.40, 11468.80, 22937.60, 45875.20, 91750.40, 183500.80, 367001.60, 734003.20, 1468006.40 } },
-                new { Type = SymbolType.Sapphire, ImageName = "Sapphire.png", Payouts = new double[] { 11.20, 22.40, 44.80, 89.60, 179.20, 358.40, 716.80, 1433.60, 2867.20, 5734.40, 11468.80, 22937.60, 45875.20, 91750.40, 183500.80, 367001.60, 734003.20 } },
-                new { Type = SymbolType.Emerald, ImageName = "Emerald.png", Payouts = new double[] { 5.60, 11.20, 22.40, 44.80, 89.60, 179.20, 358.40, 716.80, 1433.60, 2867.20, 5734.40, 11468.80, 22937.60, 45875.20, 91750.40, 183500.80, 367001.60 } },
-                new { Type = SymbolType.RumBottle, ImageName = "RumBottle.png", Payouts = new double[] { 0.05, 0.10, 0.20, 0.40, 0.80, 1.60, 3.20, 6.40, 12.80, 25.60, 51.20, 102.40, 204.80, 409.60, 819.20, 1638.40, 3276.80 } },
-                new { Type = SymbolType.Compass, ImageName = "Compass.png", Payouts = new double[] { 1.20, 2.40, 4.80, 9.60, 19.20, 38.40, 76.80, 153.60, 307.20, 614.40, 1228.80, 2457.60, 4915.20, 9830.40, 19660.80, 39321.60, 78643.20 } },
-                new { Type = SymbolType.Map, ImageName = "Map.png", Payouts = new double[] { 2.80, 5.60, 11.20, 22.40, 44.80, 89.60, 179.20, 358.40, 716.80, 1433.60, 2867.20, 5734.40, 11468.80, 22937.60, 45875.20, 91750.40, 183500.80 } },
-                new { Type = SymbolType.Parrot, ImageName = "Parrot.png", Payouts = new double[] { 0.30, 0.60, 1.20, 2.40, 4.80, 9.60, 19.20, 38.40, 76.80, 153.60, 307.20, 614.40, 1228.80, 2457.60, 4915.20, 9830.40, 19660.80 } },
-                new { Type = SymbolType.PirateHat, ImageName = "PirateHat.png", Payouts = new double[] { 0.15, 0.30, 0.60, 1.20, 2.40, 4.80, 9.60, 19.20, 38.40, 76.80, 153.60, 307.20, 614.40, 1228.80, 2457.60, 4915.20, 9830.40 } },
-                new { Type = SymbolType.Ship, ImageName = "Ship.png", Payouts = new double[] { 0.60, 1.20, 2.40, 4.80, 9.60, 19.20, 38.40, 76.80, 153.60, 307.20, 614.40, 1228.80, 2457.60, 4915.20, 9830.40, 19660.80, 39321.60 } },
-                new { Type = SymbolType.Wild, ImageName = "Wild.png", Payouts = new double[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-                new { Type = SymbolType.Scatter, ImageName = "Scatter.png", Payouts = new double[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } },
-                new { Type = SymbolType.GoldCoin, ImageName = "GoldCoin.png", Payouts = new double[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } }
-            };
-
-            foreach (var data in symbolData)
-            {
-                var image = GetEmbeddedImage(data.ImageName);
-                if (image != null)
-                {
-                    symbols.Add(new Symbol(data.Type, data.ImageName, data.Payouts));
-                }
-                else
-                {
-                    MessageBox.Show($"Failed to load image: {data.ImageName}");
-                }
-            }
-        }
-
-        private void LoadSounds()
-        {
-        }
-
-        private void PlaySound(string resourceName)
-        {
-            try
-            {
-                var stream = GetEmbeddedResourceStream(resourceName);
-                if (stream == null) return;
-
-                var reader = new WaveFileReader(stream);
-                var player = new WaveOutEvent();
-                player.Init(reader);
-                player.Play();
-
-                soundPlayers.Add(player);
-                soundReaders.Add(reader);
-
-                player.PlaybackStopped += (s, e) =>
-                {
-                    soundPlayers.Remove(player);
-                    soundReaders.Remove(reader);
-                    player.Dispose();
-                    reader.Dispose();
-                };
-            }
-            catch (Exception)
-            {
-            }
-        }
-
-        private void PlayBackgroundMusic(string resourceName)
-        {
-            try
-            {
-                if (sndBackgroundPlayer != null)
-                {
-                    sndBackgroundPlayer.Stop();
-                    sndBackgroundPlayer.Dispose();
-                    sndBackgroundReader?.Dispose();
-                    sndBackgroundPlayer = null;
-                    sndBackgroundReader = null;
-                }
-
-                var stream = GetEmbeddedResourceStream(resourceName);
-                if (stream == null) return;
-
-                sndBackgroundReader = new WaveFileReader(stream);
-                var loopStream = new NAudio.Wave.WaveChannel32(sndBackgroundReader) { PadWithZeroes = false };
-                sndBackgroundPlayer = new WaveOutEvent();
-                sndBackgroundPlayer.Init(loopStream);
-                sndBackgroundPlayer.PlaybackStopped += (s, e) =>
-                {
-                    if (sndBackgroundReader != null && !closingForm)
-                    {
-                        sndBackgroundReader.Position = 0;
-                        sndBackgroundPlayer.Play();
-                    }
-                };
-                sndBackgroundPlayer.Play();
-            }
-            catch (Exception)
-            {
-            }
-        }
-
-        private void UpdateBackgroundImage()
-        {
-            string imageName = inBonus ? "Stormy.jpg" : "Background.jpg";
-            var baseBackground = GetEmbeddedImage(imageName);
-            if (baseBackground == null)
-            {
-                return;
-            }
-
-            var composite = new Bitmap(this.Width, this.Height);
-            using (Graphics g = Graphics.FromImage(composite))
-            {
-                g.DrawImage(baseBackground, new Rectangle(0, 0, this.Width, this.Height), new Rectangle(0, 0, baseBackground.Width, baseBackground.Height), GraphicsUnit.Pixel);
-
-                using (Brush brush = new SolidBrush(Color.FromArgb(128, 64, 64, 64)))
-                {
-                    int startX = 200, startY = 50, size = 120, spacing = 130;
-                    for (int row = 0; row < ROWS; row++)
-                    {
-                        for (int col = 0; col < COLS; col++)
-                        {
-                            int x = startX + col * spacing;
-                            int y = startY + row * spacing;
-                            g.FillRectangle(brush, x, y, size, size);
-                        }
-                    }
-                }
-            }
-
-            if (this.BackgroundImage != null)
-            {
-                this.BackgroundImage.Dispose();
-            }
-            this.BackgroundImage = composite;
-            baseBackground.Dispose();
-
-            this.Invalidate();
-        }
-
-        private static Stream GetEmbeddedResourceStream(string name)
-        {
-            var assembly = Assembly.GetExecutingAssembly();
-            string resourceName = "PiratesFortuneSlot.Resources." + name;
-            var stream = assembly.GetManifestResourceStream(resourceName);
-            if (stream == null)
-            {
-                MessageBox.Show($"Sound resource not found: {resourceName}");
-            }
-            return stream;
-        }
-
-        private static Image GetEmbeddedImage(string name)
-        {
-            var assembly = Assembly.GetExecutingAssembly();
-            string resourceName = "PiratesFortuneSlot.Resources." + name;
-            using (var stream = assembly.GetManifestResourceStream(resourceName))
-            {
-                if (stream == null)
-                {
-                    MessageBox.Show($"Image resource not found: {resourceName}");
-                    return null;
-                }
-                return Image.FromStream(stream);
-            }
-        }
-
-        private void InitializeGrid()
-        {
-            int size = 100;
-            for (int row = 0; row < ROWS; row++)
-            {
-                for (int col = 0; col < COLS; col++)
-                {
-                    pbGrid[row, col] = new PictureBox
-                    {
-                        Name = $"pb{row}{col}",
-                        Location = new Point(gridCenters[row, col].X - size / 2, gridCenters[row, col].Y - size / 2),
-                        Size = new Size(size, size),
-                        SizeMode = PictureBoxSizeMode.Zoom,
-                        BackColor = Color.Transparent,
-                        Padding = new Padding(0),
-                        Margin = new Padding(0),
-                        BorderStyle = BorderStyle.None
-                    };
-
-                    Controls.Add(pbGrid[row, col]);
-                }
-            }
+            _gridManager.InitializeGrid();
+            _gridManager.GenerateGrid(inBonus);
+            _gridManager.UpdateGridDisplay();
+            _uiManager.UpdateUI(balance, bet, bonusSpins, bonusMultiplier, collectedTreasures, goldCoinRequirement, biggestWin, biggestMultiplier, inBonus, isSpinComplete, isAutoSpinning);
+            _audioManager.PlayBackgroundMusic("BackgroundMusic.wav");
         }
 
         private void btnSpin_Click(object sender, EventArgs e)
@@ -459,9 +117,9 @@ namespace PiratesFortuneSlot
                 {
                     MessageBox.Show("Insufficient balance!");
                     isAutoSpinning = false;
-                    btnAutoSpin.Text = "Auto Spin";
-                    tmrAutoSpin.Stop();
-                    UpdateUI();
+                    _uiManager.btnAutoSpin.Text = "Auto Spin";
+                    _uiManager.tmrAutoSpin.Stop();
+                    _uiManager.UpdateUI(balance, bet, bonusSpins, bonusMultiplier, collectedTreasures, goldCoinRequirement, biggestWin, biggestMultiplier, inBonus, isSpinComplete, isAutoSpinning);
                     return;
                 }
                 balance -= bet;
@@ -472,11 +130,12 @@ namespace PiratesFortuneSlot
             if (!inBonus) bonusMultiplier = 1;
             isSpinComplete = false;
             goldCoinsCountedThisSpin = false;
-            PlaySound("Spin.wav");
-            GenerateGrid();
-            AnimateDrop();
+            bonusTriggeredThisSpin = false; // Reset to allow retrigger in bonus mode
+            _audioManager.PlaySound("Spin.wav");
+            _gridManager.GenerateGrid(inBonus);
+            _gridManager.AnimateDrop();
             tmrDrop.Start();
-            UpdateUI();
+            _uiManager.UpdateUI(balance, bet, bonusSpins, bonusMultiplier, collectedTreasures, goldCoinRequirement, biggestWin, biggestMultiplier, inBonus, isSpinComplete, isAutoSpinning);
         }
 
         private void btnAutoSpin_Click(object sender, EventArgs e)
@@ -487,25 +146,25 @@ namespace PiratesFortuneSlot
                 return;
             }
             isAutoSpinning = !isAutoSpinning;
-            btnAutoSpin.Text = isAutoSpinning ? "Stop Auto" : "Auto Spin";
+            _uiManager.btnAutoSpin.Text = isAutoSpinning ? "Stop Auto" : "Auto Spin";
             if (isAutoSpinning)
             {
                 if (balance < (double)nudBet.Value)
                 {
                     MessageBox.Show("Insufficient balance to start auto-spin!");
                     isAutoSpinning = false;
-                    btnAutoSpin.Text = "Auto Spin";
+                    _uiManager.btnAutoSpin.Text = "Auto Spin";
                     return;
                 }
-                tmrAutoSpin.Start();
+                _uiManager.tmrAutoSpin.Start();
                 if (isSpinComplete)
                     btnSpin_Click(sender, e);
             }
             else
             {
-                tmrAutoSpin.Stop();
+                _uiManager.tmrAutoSpin.Stop();
             }
-            UpdateUI();
+            _uiManager.UpdateUI(balance, bet, bonusSpins, bonusMultiplier, collectedTreasures, goldCoinRequirement, biggestWin, biggestMultiplier, inBonus, isSpinComplete, isAutoSpinning);
         }
 
         private void tmrAutoSpin_Tick(object sender, EventArgs e)
@@ -515,9 +174,9 @@ namespace PiratesFortuneSlot
                 if (!isAutoSpinning || inBonus || balance < (double)nudBet.Value)
                 {
                     isAutoSpinning = false;
-                    btnAutoSpin.Text = "Auto Spin";
-                    tmrAutoSpin.Stop();
-                    UpdateUI();
+                    _uiManager.btnAutoSpin.Text = "Auto Spin";
+                    _uiManager.tmrAutoSpin.Stop();
+                    _uiManager.UpdateUI(balance, bet, bonusSpins, bonusMultiplier, collectedTreasures, goldCoinRequirement, biggestWin, biggestMultiplier, inBonus, isSpinComplete, isAutoSpinning);
                     if (balance < (double)nudBet.Value)
                     {
                         MessageBox.Show("Insufficient balance to continue auto-spin!");
@@ -528,129 +187,32 @@ namespace PiratesFortuneSlot
             btnSpin_Click(sender, e);
         }
 
-        private void AnimateDrop()
-        {
-            for (int row = 0; row < ROWS; row++)
-            {
-                for (int col = 0; col < COLS; col++)
-                {
-                    pbGrid[row, col].Location = new Point(gridCenters[row, col].X - pbGrid[row, col].Width / 2, -480);
-                    pbGrid[row, col].Image = null;
-                    finalYPositions[row, col] = gridCenters[row, col].Y - pbGrid[row, col].Height / 2;
-                }
-            }
-        }
-
-        private void AnimateCascadeDrop()
-        {
-            for (int col = 0; col < COLS; col++)
-            {
-                int writeRow = ROWS - 1;
-                List<int> emptyRows = new List<int>();
-                for (int readRow = ROWS - 1; readRow >= 0; readRow--)
-                {
-                    if (grid[readRow, col] != SymbolType.Empty)
-                    {
-                        if (writeRow != readRow)
-                        {
-                            pbGrid[writeRow, col].Location = new Point(
-                                gridCenters[writeRow, col].X - pbGrid[writeRow, col].Width / 2,
-                                gridCenters[readRow, col].Y - pbGrid[readRow, col].Height / 2
-                            );
-                            pbGrid[writeRow, col].Image = pbGrid[readRow, col].Image;
-                        }
-                        writeRow--;
-                    }
-                }
-                for (int row = 0; row <= writeRow; row++)
-                {
-                    emptyRows.Add(row);
-                    pbGrid[row, col].Location = new Point(
-                        gridCenters[row, col].X - pbGrid[row, col].Width / 2,
-                        -480
-                    );
-                    pbGrid[row, col].Image = null;
-                    finalYPositions[row, col] = gridCenters[row, col].Y - pbGrid[row, col].Height / 2;
-                }
-            }
-        }
-
-        private void UpdateUI()
-        {
-            lblBalance.Text = $"Balance: {balance:N2}";
-            nudBet.Value = (decimal)bet;
-            lblBonusSpins.Text = $"Bonus Spins: {bonusSpins}";
-            lblMultiplier.Text = $"Multiplier: {bonusMultiplier}x";
-            lblGoldCoins.Text = $"Gold Coins: {collectedTreasures}/{goldCoinRequirement}";
-            lblBiggestWin.Text = $"Biggest Win: {biggestWin:N2}";
-            lblBiggestMultiplier.Text = $"Biggest Multiplier: {biggestMultiplier:F2}x";
-            lblBonusSpins.Visible = inBonus;
-            lblMultiplier.Visible = inBonus;
-            lblGoldCoins.Visible = inBonus;
-            btnAutoSpin.Enabled = !inBonus;
-            btnSpin.Enabled = !inBonus && isSpinComplete && !isAutoSpinning;
-            UpdateBackgroundImage();
-            this.Invalidate();
-        }
-
-        private void GenerateGrid()
-        {
-            for (int row = 0; row < ROWS; row++)
-            {
-                for (int col = 0; col < COLS; col++)
-                {
-                    int rand = rnd.Next(100);
-                    if (rand < 2) grid[row, col] = SymbolType.Ruby;
-                    else if (rand < 6) grid[row, col] = SymbolType.Sapphire;
-                    else if (rand < 12) grid[row, col] = SymbolType.Emerald;
-                    else if (rand < 31) grid[row, col] = SymbolType.RumBottle;
-                    else if (rand < 41) grid[row, col] = SymbolType.Compass;
-                    else if (rand < 49) grid[row, col] = SymbolType.Map;
-                    else if (rand < 63) grid[row, col] = SymbolType.Parrot;
-                    else if (rand < 79) grid[row, col] = SymbolType.PirateHat;
-                    else if (rand < 91) grid[row, col] = SymbolType.Ship;
-                    else if (rand < 94) grid[row, col] = SymbolType.Wild;
-                    else if (rand < 97) grid[row, col] = SymbolType.Scatter;
-                    else grid[row, col] = SymbolType.GoldCoin;
-                }
-            }
-            if (inBonus)
-            {
-                int extraWilds = rnd.Next(0, 5);
-                for (int i = 0; i < extraWilds; i++)
-                {
-                    int r = rnd.Next(ROWS), c = rnd.Next(COLS);
-                    grid[r, c] = SymbolType.Wild;
-                }
-            }
-        }
-
         private void tmrDrop_Tick(object sender, EventArgs e)
         {
             const int dropSpeed = 60;
             bool allDropped = true;
 
-            for (int row = 0; row < ROWS; row++)
+            for (int row = 0; row < GridManager.ROWS; row++)
             {
-                for (int col = 0; col < COLS; col++)
+                for (int col = 0; col < GridManager.COLS; col++)
                 {
-                    int targetY = finalYPositions[row, col];
-                    if (pbGrid[row, col].Top < targetY)
+                    int targetY = _gridManager.finalYPositions[row, col];
+                    if (_gridManager.pbGrid[row, col].Top < targetY)
                     {
-                        int newTop = pbGrid[row, col].Top + dropSpeed;
+                        int newTop = _gridManager.pbGrid[row, col].Top + dropSpeed;
                         if (newTop > targetY) newTop = targetY;
-                        pbGrid[row, col].Location = new Point(pbGrid[row, col].Left, newTop);
+                        _gridManager.pbGrid[row, col].Location = new Point(_gridManager.pbGrid[row, col].Left, newTop);
                         if (newTop == targetY)
                         {
-                            var sym = symbols.Find(s => s.Type == grid[row, col]);
-                            pbGrid[row, col].Image = sym?.Image;
-                            if (grid[row, col] == SymbolType.GoldCoin)
+                            var sym = _symbolManager.Symbols.Find(s => s.Type == _gridManager.grid[row, col]);
+                            _gridManager.pbGrid[row, col].Image = sym?.Image;
+                            if (_gridManager.grid[row, col] == SymbolType.GoldCoin)
                             {
-                                PlaySound("GoldCoin.wav");
+                                _audioManager.PlaySound("GoldCoin.wav");
                             }
-                            else if (grid[row, col] == SymbolType.Scatter)
+                            else if (_gridManager.grid[row, col] == SymbolType.Scatter)
                             {
-                                PlaySound("Win.wav");
+                                _audioManager.PlaySound("Win.wav");
                             }
                         }
                         allDropped = false;
@@ -661,7 +223,7 @@ namespace PiratesFortuneSlot
             if (allDropped)
             {
                 tmrDrop.Stop();
-                UpdateGridDisplay();
+                _gridManager.UpdateGridDisplay();
                 CheckWinsAndCascades();
             }
             this.Invalidate();
@@ -672,27 +234,27 @@ namespace PiratesFortuneSlot
             const int dropSpeed = 60;
             bool allDropped = true;
 
-            for (int row = 0; row < ROWS; row++)
+            for (int row = 0; row < GridManager.ROWS; row++)
             {
-                for (int col = 0; col < COLS; col++)
+                for (int col = 0; col < GridManager.COLS; col++)
                 {
-                    int targetY = finalYPositions[row, col];
-                    if (pbGrid[row, col].Top < targetY)
+                    int targetY = _gridManager.finalYPositions[row, col];
+                    if (_gridManager.pbGrid[row, col].Top < targetY)
                     {
-                        int newTop = pbGrid[row, col].Top + dropSpeed;
+                        int newTop = _gridManager.pbGrid[row, col].Top + dropSpeed;
                         if (newTop > targetY) newTop = targetY;
-                        pbGrid[row, col].Location = new Point(pbGrid[row, col].Left, newTop);
+                        _gridManager.pbGrid[row, col].Location = new Point(_gridManager.pbGrid[row, col].Left, newTop);
                         if (newTop == targetY)
                         {
-                            var sym = symbols.Find(s => s.Type == grid[row, col]);
-                            pbGrid[row, col].Image = sym?.Image;
-                            if (grid[row, col] == SymbolType.GoldCoin)
+                            var sym = _symbolManager.Symbols.Find(s => s.Type == _gridManager.grid[row, col]);
+                            _gridManager.pbGrid[row, col].Image = sym?.Image;
+                            if (_gridManager.grid[row, col] == SymbolType.GoldCoin)
                             {
-                                PlaySound("GoldCoin.wav");
+                                _audioManager.PlaySound("GoldCoin.wav");
                             }
-                            else if (grid[row, col] == SymbolType.Scatter)
+                            else if (_gridManager.grid[row, col] == SymbolType.Scatter)
                             {
-                                PlaySound("Win.wav");
+                                _audioManager.PlaySound("Win.wav");
                             }
                         }
                         allDropped = false;
@@ -702,10 +264,9 @@ namespace PiratesFortuneSlot
 
             if (allDropped)
             {
-                tmrCascadeDrop.Stop();
+                _uiManager.tmrCascadeDrop.Stop();
                 isCascading = false;
-                UpdateGridDisplay();
-
+                _gridManager.UpdateGridDisplay();
                 var tmrDelay = new Timer { Interval = 500 };
                 tmrDelay.Tick += (s, ev) =>
                 {
@@ -718,21 +279,70 @@ namespace PiratesFortuneSlot
             this.Invalidate();
         }
 
-        private void UpdateGridDisplay()
+        private void tmrExplode_Tick(object sender, EventArgs e)
         {
-            for (int row = 0; row < ROWS; row++)
+            _uiManager.tmrExplode.Stop();
+            if (currentExplodingCluster != null)
             {
-                for (int col = 0; col < COLS; col++)
+                foreach (var p in currentExplodingCluster)
                 {
-                    var sym = symbols.Find(s => s.Type == grid[row, col]);
-                    pbGrid[row, col].Image = sym?.Image;
-                    pbGrid[row, col].Location = new Point(
-                        gridCenters[row, col].X - pbGrid[row, col].Width / 2,
-                        gridCenters[row, col].Y - pbGrid[row, col].Height / 2
-                    );
+                    _gridManager.pbGrid[p.Y, p.X].BackColor = Color.FromArgb(255, 255, 100, 100);
                 }
+                this.Invalidate();
+                if (!inBonus && goldCoins >= 2)
+                {
+                    currentWin *= goldCoins;
+                    _uiManager.lblWin.Location = new Point(350, 550);
+                    _uiManager.lblWin.Text = $"Base Pay: {baseWin:N2} x{goldCoins} \n Gold Coin Multiplier";
+                    _uiManager.lblWin.Visible = true;
+                    _uiManager.tmrBaseWinDisplay.Start();
+                }
+                else
+                {
+                    _uiManager.lblWin.Location = new Point(450, 600);
+                    _uiManager.lblWin.Text = $"Win: {currentWin:N2}";
+                    _uiManager.lblWin.Visible = true;
+                    _uiManager.tmrWinDisplay.Start();
+                }
+                _audioManager.PlaySound("Explosion.wav");
+                _audioManager.PlaySound("Win.wav");
+
+                var tmrClear = new Timer { Interval = 300 };
+                tmrClear.Tick += (s, ev) =>
+                {
+                    tmrClear.Stop();
+                    _gridManager.ExplodeCluster(currentExplodingCluster);
+                    currentExplodingCluster = null;
+                    isExploding = false;
+                    _gridManager.CascadeSymbols(rnd, inBonus);
+                    _gridManager.AnimateCascadeDrop();
+                    isCascading = true;
+                    _uiManager.tmrCascadeDrop.Start();
+                    tmrClear.Dispose();
+                };
+                tmrClear.Start();
             }
-            this.Invalidate();
+            else
+            {
+                isExploding = false;
+                _gridManager.CascadeSymbols(rnd, inBonus);
+                _gridManager.AnimateCascadeDrop();
+                isCascading = true;
+                _uiManager.tmrCascadeDrop.Start();
+            }
+        }
+
+        private void tmrBaseWinDisplay_Tick(object sender, EventArgs e)
+        {
+            _uiManager.tmrBaseWinDisplay.Stop();
+            _uiManager.lblWin.Text = $"Win: {totalSpinWin:N2}";
+            _uiManager.tmrWinDisplay.Start();
+        }
+
+        private void tmrWinDisplay_Tick(object sender, EventArgs e)
+        {
+            _uiManager.tmrWinDisplay.Stop();
+            _uiManager.lblWin.Visible = false;
         }
 
         private void CheckWinsAndCascades()
@@ -744,23 +354,23 @@ namespace PiratesFortuneSlot
             int scatterCount = 0;
             int goldCoinCount = 0;
 
-            bool[,] visited = new bool[ROWS, COLS];
+            bool[,] visited = new bool[GridManager.ROWS, GridManager.COLS];
             List<List<Point>> winningClusters = new List<List<Point>>();
 
-            for (int row = 0; row < ROWS; row++)
+            for (int row = 0; row < GridManager.ROWS; row++)
             {
-                for (int col = 0; col < COLS; col++)
+                for (int col = 0; col < GridManager.COLS; col++)
                 {
-                    if (grid[row, col] == SymbolType.Scatter) scatterCount++;
-                    if (grid[row, col] == SymbolType.GoldCoin) goldCoinCount++;
-                    if (!visited[row, col] && grid[row, col] != SymbolType.Empty && grid[row, col] != SymbolType.Scatter && grid[row, col] != SymbolType.GoldCoin)
+                    if (_gridManager.grid[row, col] == SymbolType.Scatter) scatterCount++;
+                    if (_gridManager.grid[row, col] == SymbolType.GoldCoin) goldCoinCount++;
+                    if (!visited[row, col] && _gridManager.grid[row, col] != SymbolType.Empty && _gridManager.grid[row, col] != SymbolType.Scatter && _gridManager.grid[row, col] != SymbolType.GoldCoin)
                     {
-                        List<Point> cluster = GetCluster(row, col, visited);
+                        List<Point> cluster = _gridManager.GetCluster(row, col, visited, _symbolManager.Symbols);
                         if (cluster.Count >= 4)
                         {
                             hasWin = true;
                             winningClusters.Add(cluster);
-                            double payout = CalculatePayout(cluster);
+                            double payout = _gridManager.CalculatePayout(cluster, _symbolManager.Symbols);
                             totalPayout += payout;
                         }
                     }
@@ -781,7 +391,7 @@ namespace PiratesFortuneSlot
                     biggestMultiplier = Math.Max(biggestMultiplier, bonusMultiplier);
                     MessageBox.Show("Coins collected!");
                     MessageBox.Show("+1 Multiplier, +2 Spins Added!");
-                    UpdateUI();
+                    _uiManager.UpdateUI(balance, bet, bonusSpins, bonusMultiplier, collectedTreasures, goldCoinRequirement, biggestWin, biggestMultiplier, inBonus, isSpinComplete, isAutoSpinning);
                 }
             }
 
@@ -800,13 +410,13 @@ namespace PiratesFortuneSlot
                 {
                     biggestMultiplier = Math.Max(biggestMultiplier, goldCoinCount);
                 }
-                UpdateUI();
+                _uiManager.UpdateUI(balance, bet, bonusSpins, bonusMultiplier, collectedTreasures, goldCoinRequirement, biggestWin, biggestMultiplier, inBonus, isSpinComplete, isAutoSpinning);
 
                 if (winningClusters.Count > 0)
                 {
                     currentExplodingCluster = winningClusters[0];
                     isExploding = true;
-                    tmrExplode.Start();
+                    _uiManager.tmrExplode.Start();
                 }
             }
             else
@@ -820,18 +430,24 @@ namespace PiratesFortuneSlot
                 {
                     bonusTriggeredThisSpin = true;
                     bonusSpins += 10;
-                    PlaySound("BonusPirate.wav");
+                    _audioManager.PlaySound("BonusPirate.wav");
                     MessageBox.Show("Bonus Retriggered! +10 Spins!");
-                    UpdateUI();
+                    _uiManager.UpdateUI(balance, bet, bonusSpins, bonusMultiplier, collectedTreasures, goldCoinRequirement, biggestWin, biggestMultiplier, inBonus, isSpinComplete, isAutoSpinning);
+                    if (!isCascading && !isExploding && bonusSpins > 0)
+                    {
+                        _gridManager.UpdateGridDisplay();
+                        bonusSpins--;
+                        btnSpin_Click(null, null);
+                    }
                 }
                 else if (inBonus)
                 {
                     bool needsCascade = false;
-                    for (int row = 0; row < ROWS; row++)
+                    for (int row = 0; row < GridManager.ROWS; row++)
                     {
-                        for (int col = 0; col < COLS; col++)
+                        for (int col = 0; col < GridManager.COLS; col++)
                         {
-                            if (grid[row, col] == SymbolType.Empty)
+                            if (_gridManager.grid[row, col] == SymbolType.Empty)
                             {
                                 needsCascade = true;
                                 break;
@@ -842,48 +458,48 @@ namespace PiratesFortuneSlot
 
                     if (needsCascade)
                     {
-                        CascadeSymbols();
-                        AnimateCascadeDrop();
+                        _gridManager.CascadeSymbols(rnd, inBonus);
+                        _gridManager.AnimateCascadeDrop();
                         isCascading = true;
-                        tmrCascadeDrop.Start();
+                        _uiManager.tmrCascadeDrop.Start();
                     }
                     else if (bonusSpins > 0)
                     {
-                        UpdateGridDisplay();
+                        _gridManager.UpdateGridDisplay();
                         bonusSpins--;
                         btnSpin_Click(null, null);
                     }
                     else
                     {
-                        PlaySound("Win.wav");
-                        PlaySound("PirateTalk.wav");
+                        _audioManager.PlaySound("Win.wav");
+                        _audioManager.PlaySound("PirateTalk.wav");
                         inBonus = false;
                         extraSpinsAdded = 0;
                         goldCoinRequirement = 5;
                         collectedTreasures = 0;
                         isAutoSpinning = false;
-                        btnAutoSpin.Text = "Auto Spin";
-                        tmrAutoSpin.Stop();
+                        _uiManager.btnAutoSpin.Text = "Auto Spin";
+                        _uiManager.tmrAutoSpin.Stop();
                         balance += totalSpinWin;
                         MessageBox.Show($"Bonus over! Total win: {totalSpinWin:N2}");
                         totalSpinWin = 0;
-                        lblWin.Visible = false;
+                        _uiManager.lblWin.Visible = false;
                         isSpinComplete = true;
                         bonusTriggeredThisSpin = false;
                         goldCoinsCountedThisSpin = false;
-                        PlayBackgroundMusic("BackgroundMusic.wav");
-                        UpdateBackgroundImage();
-                        UpdateUI();
+                        _audioManager.PlayBackgroundMusic("BackgroundMusic.wav");
+                        _uiManager.UpdateBackgroundImage(inBonus);
+                        _uiManager.UpdateUI(balance, bet, bonusSpins, bonusMultiplier, collectedTreasures, goldCoinRequirement, biggestWin, biggestMultiplier, inBonus, isSpinComplete, isAutoSpinning);
                     }
                 }
                 else
                 {
                     bool needsCascade = false;
-                    for (int row = 0; row < ROWS; row++)
+                    for (int row = 0; row < GridManager.ROWS; row++)
                     {
-                        for (int col = 0; col < COLS; col++)
+                        for (int col = 0; col < GridManager.COLS; col++)
                         {
-                            if (grid[row, col] == SymbolType.Empty)
+                            if (_gridManager.grid[row, col] == SymbolType.Empty)
                             {
                                 needsCascade = true;
                                 break;
@@ -893,95 +509,29 @@ namespace PiratesFortuneSlot
                     }
                     if (needsCascade)
                     {
-                        CascadeSymbols();
-                        AnimateCascadeDrop();
+                        _gridManager.CascadeSymbols(rnd, inBonus);
+                        _gridManager.AnimateCascadeDrop();
                         isCascading = true;
-                        tmrCascadeDrop.Start();
+                        _uiManager.tmrCascadeDrop.Start();
                     }
                     else
                     {
                         balance += totalSpinWin;
                         totalSpinWin = 0;
-                        lblWin.Visible = false;
+                        _uiManager.lblWin.Visible = false;
                         isSpinComplete = true;
                         bonusTriggeredThisSpin = false;
                         goldCoinsCountedThisSpin = false;
-                        UpdateUI();
+                        _uiManager.UpdateUI(balance, bet, bonusSpins, bonusMultiplier, collectedTreasures, goldCoinRequirement, biggestWin, biggestMultiplier, inBonus, isSpinComplete, isAutoSpinning);
                     }
                 }
             }
         }
 
-        private void tmrExplode_Tick(object sender, EventArgs e)
-        {
-            tmrExplode.Stop();
-            if (currentExplodingCluster != null)
-            {
-                foreach (var p in currentExplodingCluster)
-                {
-                    pbGrid[p.Y, p.X].BackColor = Color.FromArgb(255, 255, 100, 100);
-                }
-                this.Invalidate();
-                if (!inBonus && goldCoins >= 2)
-                {
-                    currentWin *= goldCoins;
-                    lblWin.Location = new Point(350, 550);
-                    lblWin.Text = $"Base Pay: {baseWin:N2} x{goldCoins} \n Gold Coin Multiplier";
-                    lblWin.Visible = true;
-                    tmrBaseWinDisplay.Start();
-                }
-                else
-                {
-                    lblWin.Location = new Point(450, 600);
-                    lblWin.Text = $"Win: {currentWin:N2}";
-                    lblWin.Visible = true;
-                    tmrWinDisplay.Start();
-                }
-                PlaySound("Explosion.wav");
-                PlaySound("Win.wav");
-
-                var tmrClear = new Timer { Interval = 300 };
-                tmrClear.Tick += (s, ev) =>
-                {
-                    tmrClear.Stop();
-                    ExplodeCluster(currentExplodingCluster);
-                    currentExplodingCluster = null;
-                    isExploding = false;
-                    CascadeSymbols();
-                    AnimateCascadeDrop();
-                    isCascading = true;
-                    tmrCascadeDrop.Start();
-                    tmrClear.Dispose();
-                };
-                tmrClear.Start();
-            }
-            else
-            {
-                isExploding = false;
-                CascadeSymbols();
-                AnimateCascadeDrop();
-                isCascading = true;
-                tmrCascadeDrop.Start();
-            }
-        }
-
-        private void tmrBaseWinDisplay_Tick(object sender, EventArgs e)
-        {
-            tmrBaseWinDisplay.Stop();
-            lblWin.Text = $"Win: {totalSpinWin:N2}";
-            tmrWinDisplay.Start();
-        }
-
-        private void tmrWinDisplay_Tick(object sender, EventArgs e)
-        {
-            tmrWinDisplay.Stop();
-            lblWin.Visible = false;
-        }
-
         private void EnterBonus(int scatters)
         {
-            PlaySound("Win.wav");
-            PlaySound("BonusPirate.wav");
+            _audioManager.PlaySound("Win.wav");
+            _audioManager.PlaySound("BonusPirate.wav");
             inBonus = true;
             bonusSpins = 10 + (scatters > 3 ? 5 * (scatters - 3) : 0);
             bonusMultiplier = 1;
@@ -989,134 +539,27 @@ namespace PiratesFortuneSlot
             extraSpinsAdded = 0;
             goldCoinRequirement = 5;
             isAutoSpinning = false;
-            btnAutoSpin.Text = "Auto Spin";
-            tmrAutoSpin.Stop();
+            _uiManager.btnAutoSpin.Text = "Auto Spin";
+            _uiManager.tmrAutoSpin.Stop();
             MessageBox.Show("Ahoy! Treasure Hunt Bonus Activated!");
-            PlayBackgroundMusic("Stormy.wav");
-            UpdateBackgroundImage();
+            _audioManager.PlayBackgroundMusic("Stormy.wav");
+            _uiManager.UpdateBackgroundImage(inBonus);
             btnSpin_Click(null, null);
-        }
-
-        private List<Point> GetCluster(int startRow, int startCol, bool[,] visited)
-        {
-            List<Point> cluster = new List<Point>();
-            SymbolType type = grid[startRow, startCol];
-            if (type == SymbolType.Wild || type == SymbolType.Empty || type == SymbolType.Scatter || type == SymbolType.GoldCoin)
-                return cluster;
-
-            Stack<Point> stack = new Stack<Point>();
-            stack.Push(new Point(startCol, startRow));
-            visited[startRow, startCol] = true;
-
-            while (stack.Count > 0)
-            {
-                Point p = stack.Pop();
-                cluster.Add(p);
-
-                int[] dx = { -1, 1, 0, 0 };
-                int[] dy = { 0, 0, -1, 1 };
-                for (int i = 0; i < 4; i++)
-                {
-                    int nx = p.X + dx[i], ny = p.Y + dy[i];
-                    if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && !visited[ny, nx] &&
-                        (grid[ny, nx] == type || grid[ny, nx] == SymbolType.Wild))
-                    {
-                        visited[ny, nx] = true;
-                        stack.Push(new Point(nx, ny));
-                    }
-                }
-            }
-            return cluster;
-        }
-
-        private double CalculatePayout(List<Point> cluster)
-        {
-            if (cluster.Count == 0) return 0;
-            SymbolType type = grid[cluster[0].Y, cluster[0].X];
-            var sym = symbols.Find(s => s.Type == type);
-            if (sym == null)
-            {
-                return 0;
-            }
-            int size = cluster.Count;
-            double payout = 0;
-            if (size >= 4 && size <= 20)
-            {
-                payout = sym.Payouts[size - 4];
-            }
-            return payout;
-        }
-
-        private void ExplodeCluster(List<Point> cluster)
-        {
-            foreach (var p in cluster)
-            {
-                grid[p.Y, p.X] = SymbolType.Empty;
-                pbGrid[p.Y, p.X].Image = null;
-                pbGrid[p.Y, p.X].BackColor = Color.Transparent;
-            }
-        }
-
-        private void CascadeSymbols()
-        {
-            for (int col = 0; col < COLS; col++)
-            {
-                int writeRow = ROWS - 1;
-                for (int readRow = ROWS - 1; readRow >= 0; readRow--)
-                {
-                    if (grid[readRow, col] != SymbolType.Empty)
-                    {
-                        grid[writeRow, col] = grid[readRow, col];
-                        if (writeRow != readRow) grid[readRow, col] = SymbolType.Empty;
-                        writeRow--;
-                    }
-                }
-                for (int row = 0; row <= writeRow; row++)
-                {
-                    int rand = rnd.Next(100);
-                    if (rand < 2) grid[row, col] = SymbolType.Ruby;
-                    else if (rand < 6) grid[row, col] = SymbolType.Sapphire;
-                    else if (rand < 12) grid[row, col] = SymbolType.Emerald;
-                    else if (rand < 31) grid[row, col] = SymbolType.RumBottle;
-                    else if (rand < 41) grid[row, col] = SymbolType.Compass;
-                    else if (rand < 49) grid[row, col] = SymbolType.Map;
-                    else if (rand < 63) grid[row, col] = SymbolType.Parrot;
-                    else if (rand < 79) grid[row, col] = SymbolType.PirateHat;
-                    else if (rand < 91) grid[row, col] = SymbolType.Ship;
-                    else if (rand < 94) grid[row, col] = SymbolType.Wild;
-                    else if (rand < 97) grid[row, col] = SymbolType.Scatter;
-                    else grid[row, col] = SymbolType.GoldCoin;
-                }
-            }
         }
 
         private void tmrCascade_Tick(object sender, EventArgs e)
         {
             tmrCascade.Stop();
-            CascadeSymbols();
-            AnimateCascadeDrop();
+            _gridManager.CascadeSymbols(rnd, inBonus);
+            _gridManager.AnimateCascadeDrop();
             isCascading = true;
-            tmrCascadeDrop.Start();
+            _uiManager.tmrCascadeDrop.Start();
         }
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
             closingForm = true;
-            if (sndBackgroundPlayer != null)
-            {
-                sndBackgroundPlayer.Stop();
-                sndBackgroundPlayer.Dispose();
-                sndBackgroundReader?.Dispose();
-            }
-            foreach (var player in soundPlayers)
-            {
-                player.Stop();
-                player.Dispose();
-            }
-            foreach (var reader in soundReaders)
-            {
-                reader.Dispose();
-            }
+            _audioManager.Dispose();
             if (this.BackgroundImage != null)
             {
                 this.BackgroundImage.Dispose();
