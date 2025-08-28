@@ -48,32 +48,27 @@ namespace PiratesFortuneSlot
         private double biggestWin = 0.00;
         private int collectedTreasures = 0;
         private int extraSpinsAdded = 0;
-        private int goldCoinRequirement = 3;
+        private int goldCoinRequirement = 5;
         private bool isAutoSpinning = false;
         private bool isSpinComplete = true;
         private bool bonusTriggeredThisSpin = false;
+        private bool goldCoinsCountedThisSpin = false;
         private IWavePlayer sndBackgroundPlayer;
         private WaveFileReader sndBackgroundReader;
         private List<IWavePlayer> soundPlayers = new List<IWavePlayer>();
         private List<WaveFileReader> soundReaders = new List<WaveFileReader>();
         private int[,] finalYPositions = new int[ROWS, COLS];
-        private int spinCount = 0;
-        private int spinsWon = 0;
-        private double winPercentage = 0;
         private Label lblBonusSpins;
         private Label lblMultiplier;
         private Label lblGoldCoins;
         private Label lblBiggestWin;
         private Label lblBiggestMultiplier;
-        private Label lblTotalSpins;
-        private Label lblWinPercentage;
         private Button btnAutoSpin;
         private Timer tmrWinDisplay;
         private Timer tmrBaseWinDisplay;
         private Timer tmrAutoSpin;
         private Timer tmrExplode;
         private Timer tmrCascadeDrop;
-        private Point lblWinInitialPos;
         private double baseWin;
         private bool closingForm = false;
         private List<Point> currentExplodingCluster;
@@ -93,7 +88,6 @@ namespace PiratesFortuneSlot
             lblWin.Size = new Size(200, 40);
             lblWin.TextAlign = ContentAlignment.MiddleCenter;
             lblWin.Visible = false;
-            lblWinInitialPos = lblWin.Location;
 
             lblBonusSpins = new Label
             {
@@ -135,7 +129,7 @@ namespace PiratesFortuneSlot
             {
                 Location = new Point(900, 250),
                 Font = new Font("Arial", 12, FontStyle.Bold),
-                Size = new Size(150, 25),
+                Size = new Size(250, 25),
                 Text = "Biggest Win: 0.00",
                 ForeColor = Color.White,
                 BackColor = Color.Transparent
@@ -152,28 +146,6 @@ namespace PiratesFortuneSlot
                 BackColor = Color.Transparent
             };
             Controls.Add(lblBiggestMultiplier);
-
-            lblTotalSpins = new Label
-            {
-                Location = new Point(900, 300),
-                Font = new Font("Arial", 12, FontStyle.Bold),
-                Size = new Size(200, 25),
-                Text = "Total Spins: 0",
-                ForeColor = Color.White,
-                BackColor = Color.Transparent
-            };
-            Controls.Add(lblTotalSpins);
-
-            lblWinPercentage = new Label
-            {
-                Location = new Point(900, 350),
-                Font = new Font("Arial", 12, FontStyle.Bold),
-                Size = new Size(200, 25),
-                Text = "Win Percentage: 0",
-                ForeColor = Color.White,
-                BackColor = Color.Transparent
-            };
-            Controls.Add(lblWinPercentage);
 
             btnAutoSpin = new Button
             {
@@ -235,7 +207,7 @@ namespace PiratesFortuneSlot
             nudBet.Size = new Size(80, 25);
             nudBet.DecimalPlaces = 2;
             nudBet.Minimum = 0.10m;
-            nudBet.Maximum = 100.00m;
+            nudBet.Maximum = 1000.00m;
             nudBet.Value = 10.00m;
             nudBet.Increment = 0.10m;
             btnSpin.Location = new Point(1000, 600);
@@ -499,8 +471,7 @@ namespace PiratesFortuneSlot
             currentWin = 0.00;
             if (!inBonus) bonusMultiplier = 1;
             isSpinComplete = false;
-            spinCount++;
-
+            goldCoinsCountedThisSpin = false;
             PlaySound("Spin.wav");
             GenerateGrid();
             AnimateDrop();
@@ -606,16 +577,13 @@ namespace PiratesFortuneSlot
 
         private void UpdateUI()
         {
-            lblBalance.Text = $"Balance: {balance:F2}";
+            lblBalance.Text = $"Balance: {balance:N2}";
             nudBet.Value = (decimal)bet;
             lblBonusSpins.Text = $"Bonus Spins: {bonusSpins}";
             lblMultiplier.Text = $"Multiplier: {bonusMultiplier}x";
             lblGoldCoins.Text = $"Gold Coins: {collectedTreasures}/{goldCoinRequirement}";
-            lblBiggestWin.Text = $"Biggest Win: {biggestWin:F2}";
+            lblBiggestWin.Text = $"Biggest Win: {biggestWin:N2}";
             lblBiggestMultiplier.Text = $"Biggest Multiplier: {biggestMultiplier:F2}x";
-            lblTotalSpins.Text = $"Total Spins: {spinCount}";
-            winPercentage = spinCount > 0 ? (double)spinsWon / spinCount * 100 : 0;
-            lblWinPercentage.Text = $"Win Percentage: {winPercentage:F2}%";
             lblBonusSpins.Visible = inBonus;
             lblMultiplier.Visible = inBonus;
             lblGoldCoins.Visible = inBonus;
@@ -737,7 +705,15 @@ namespace PiratesFortuneSlot
                 tmrCascadeDrop.Stop();
                 isCascading = false;
                 UpdateGridDisplay();
-                CheckWinsAndCascades();
+
+                var tmrDelay = new Timer { Interval = 500 };
+                tmrDelay.Tick += (s, ev) =>
+                {
+                    tmrDelay.Stop();
+                    CheckWinsAndCascades();
+                    tmrDelay.Dispose();
+                };
+                tmrDelay.Start();
             }
             this.Invalidate();
         }
@@ -791,26 +767,26 @@ namespace PiratesFortuneSlot
                 }
             }
 
-            if (inBonus && goldCoinCount > 0)
+            if (inBonus && goldCoinCount > 0 && !goldCoinsCountedThisSpin)
             {
                 collectedTreasures += goldCoinCount;
+                goldCoinsCountedThisSpin = true;
                 if (collectedTreasures >= goldCoinRequirement && extraSpinsAdded < 11)
                 {
                     bonusMultiplier++;
                     bonusSpins += 2;
                     extraSpinsAdded += 1;
                     collectedTreasures = 0;
-                    goldCoinRequirement = Math.Min(goldCoinRequirement + 1, 10);
+                    goldCoinRequirement = Math.Min(goldCoinRequirement * 2, 10);
                     biggestMultiplier = Math.Max(biggestMultiplier, bonusMultiplier);
-                    MessageBox.Show($"Coins collected! +1 Multiplier, +1 Spin! Next: Collect {goldCoinRequirement} coins");
+                    MessageBox.Show("Coins collected!");
+                    MessageBox.Show("+1 Multiplier, +2 Spins Added!");
                     UpdateUI();
                 }
             }
 
             if (hasWin)
             {
-                spinsWon++;
-                PlaySound("Win.wav");
                 baseWin = totalPayout * bet * bonusMultiplier;
                 currentWin = baseWin;
                 goldCoins = goldCoinCount;
@@ -850,33 +826,32 @@ namespace PiratesFortuneSlot
                 }
                 else if (inBonus)
                 {
-                    bonusSpins--;
-                    if (bonusSpins > 0)
+                    bool needsCascade = false;
+                    for (int row = 0; row < ROWS; row++)
                     {
-                        bool needsCascade = false;
-                        for (int row = 0; row < ROWS; row++)
+                        for (int col = 0; col < COLS; col++)
                         {
-                            for (int col = 0; col < COLS; col++)
+                            if (grid[row, col] == SymbolType.Empty)
                             {
-                                if (grid[row, col] == SymbolType.Empty)
-                                {
-                                    needsCascade = true;
-                                    break;
-                                }
+                                needsCascade = true;
+                                break;
                             }
-                            if (needsCascade) break;
                         }
-                        if (needsCascade)
-                        {
-                            CascadeSymbols();
-                            AnimateCascadeDrop();
-                            isCascading = true;
-                            tmrCascadeDrop.Start();
-                        }
-                        else
-                        {
-                            btnSpin_Click(null, null);
-                        }
+                        if (needsCascade) break;
+                    }
+
+                    if (needsCascade)
+                    {
+                        CascadeSymbols();
+                        AnimateCascadeDrop();
+                        isCascading = true;
+                        tmrCascadeDrop.Start();
+                    }
+                    else if (bonusSpins > 0)
+                    {
+                        UpdateGridDisplay();
+                        bonusSpins--;
+                        btnSpin_Click(null, null);
                     }
                     else
                     {
@@ -884,17 +859,18 @@ namespace PiratesFortuneSlot
                         PlaySound("PirateTalk.wav");
                         inBonus = false;
                         extraSpinsAdded = 0;
-                        goldCoinRequirement = 3;
+                        goldCoinRequirement = 5;
                         collectedTreasures = 0;
                         isAutoSpinning = false;
                         btnAutoSpin.Text = "Auto Spin";
                         tmrAutoSpin.Stop();
                         balance += totalSpinWin;
-                        MessageBox.Show($"Bonus over! Total win: {totalSpinWin:F2}");
+                        MessageBox.Show($"Bonus over! Total win: {totalSpinWin:N2}");
                         totalSpinWin = 0;
                         lblWin.Visible = false;
                         isSpinComplete = true;
                         bonusTriggeredThisSpin = false;
+                        goldCoinsCountedThisSpin = false;
                         PlayBackgroundMusic("BackgroundMusic.wav");
                         UpdateBackgroundImage();
                         UpdateUI();
@@ -929,6 +905,7 @@ namespace PiratesFortuneSlot
                         lblWin.Visible = false;
                         isSpinComplete = true;
                         bonusTriggeredThisSpin = false;
+                        goldCoinsCountedThisSpin = false;
                         UpdateUI();
                     }
                 }
@@ -949,18 +926,19 @@ namespace PiratesFortuneSlot
                 {
                     currentWin *= goldCoins;
                     lblWin.Location = new Point(350, 550);
-                    lblWin.Text = $"Base Pay: {baseWin:F2} x{goldCoins} \n Gold Coin Multiplier";
+                    lblWin.Text = $"Base Pay: {baseWin:N2} x{goldCoins} \n Gold Coin Multiplier";
                     lblWin.Visible = true;
                     tmrBaseWinDisplay.Start();
                 }
                 else
                 {
                     lblWin.Location = new Point(450, 600);
-                    lblWin.Text = $"Win: {currentWin:F2}";
+                    lblWin.Text = $"Win: {currentWin:N2}";
                     lblWin.Visible = true;
                     tmrWinDisplay.Start();
                 }
                 PlaySound("Explosion.wav");
+                PlaySound("Win.wav");
 
                 var tmrClear = new Timer { Interval = 300 };
                 tmrClear.Tick += (s, ev) =>
@@ -990,7 +968,7 @@ namespace PiratesFortuneSlot
         private void tmrBaseWinDisplay_Tick(object sender, EventArgs e)
         {
             tmrBaseWinDisplay.Stop();
-            lblWin.Text = $"Win: {totalSpinWin:F2}";
+            lblWin.Text = $"Win: {totalSpinWin:N2}";
             tmrWinDisplay.Start();
         }
 
@@ -1009,13 +987,13 @@ namespace PiratesFortuneSlot
             bonusMultiplier = 1;
             collectedTreasures = 0;
             extraSpinsAdded = 0;
-            goldCoinRequirement = 3;
+            goldCoinRequirement = 5;
             isAutoSpinning = false;
             btnAutoSpin.Text = "Auto Spin";
             tmrAutoSpin.Stop();
+            MessageBox.Show("Ahoy! Treasure Hunt Bonus Activated!");
             PlayBackgroundMusic("Stormy.wav");
             UpdateBackgroundImage();
-            MessageBox.Show("Ahoy! Treasure Hunt Bonus Activated!");
             btnSpin_Click(null, null);
         }
 
