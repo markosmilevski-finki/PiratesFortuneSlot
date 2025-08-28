@@ -35,6 +35,7 @@ namespace PiratesFortuneSlot
         private const int ROWS = 4;
         private SymbolType[,] grid = new SymbolType[ROWS, COLS];
         private PictureBox[,] pbGrid = new PictureBox[ROWS, COLS];
+        private Point[,] gridCenters;
         private int balance = 1000;
         private int currentWin = 0;
         private int totalSpinWin = 0;
@@ -73,7 +74,7 @@ namespace PiratesFortuneSlot
             InitializeComponent();
             this.DoubleBuffered = true;
 
-            lblWin.Location = new Point(640 - 100, 360);
+            lblWin.Location = new Point(420, 600);
             lblWin.Font = new Font("Arial", 24, FontStyle.Bold);
             lblWin.ForeColor = Color.FromArgb(255, 215, 0);
             lblWin.BackColor = Color.Transparent;
@@ -176,7 +177,9 @@ namespace PiratesFortuneSlot
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.BackgroundImageLayout = ImageLayout.Stretch;
-            this.BackgroundImage = GetEmbeddedImage("Background1.jpg");
+
+            UpdateBackgroundImage();
+
             lblBalance.Location = new Point(25, 630);
             lblBalance.Font = new Font("Arial", 12, FontStyle.Bold);
             lblBalance.ForeColor = Color.White;
@@ -200,11 +203,34 @@ namespace PiratesFortuneSlot
                 return;
             }
 
+            gridCenters = GetGridCenterCoordinates();
             InitializeGrid();
             GenerateGrid();
             UpdateGridDisplay();
             UpdateUI();
             PlayBackgroundMusic("BackgroundMusic.wav");
+        }
+
+        private Point[,] GetGridCenterCoordinates()
+        {
+            Point[,] centers = new Point[ROWS, COLS];
+            int startX = 200, startY = 50, spacing = 130, size = 100;
+
+            for (int row = 0; row < ROWS; row++)
+            {
+                for (int col = 0; col < COLS; col++)
+                {
+                    int centerX = startX + col * spacing + size / 2;
+                    int centerY = startY + row * spacing + size / 2;
+                    centers[row, col] = new Point(centerX, centerY);
+                }
+                if (row > 0)
+                {
+                    startY -= 10;
+                }
+                if (row == 2) startX += 5;
+            }
+            return centers;
         }
 
         private void InitializeSymbols()
@@ -283,6 +309,7 @@ namespace PiratesFortuneSlot
                     sndBackgroundPlayer = null;
                     sndBackgroundReader = null;
                 }
+
                 var stream = GetEmbeddedResourceStream(resourceName);
                 if (stream == null) return;
 
@@ -308,15 +335,39 @@ namespace PiratesFortuneSlot
         private void UpdateBackgroundImage()
         {
             string imageName = inBonus ? "Stormy.jpg" : "Background1.jpg";
-            var newBackground = GetEmbeddedImage(imageName);
-            if (newBackground != null)
+            var baseBackground = GetEmbeddedImage(imageName);
+            if (baseBackground == null)
             {
-                if (this.BackgroundImage != null)
-                {
-                    this.BackgroundImage.Dispose();
-                }
-                this.BackgroundImage = newBackground;
+                return;
             }
+
+            var composite = new Bitmap(this.Width, this.Height);
+            using (Graphics g = Graphics.FromImage(composite))
+            {
+                g.DrawImage(baseBackground, new Rectangle(0, 0, this.Width, this.Height), new Rectangle(0, 0, baseBackground.Width, baseBackground.Height), GraphicsUnit.Pixel);
+
+                using (Brush brush = new SolidBrush(Color.FromArgb(128, 64, 64, 64)))
+                {
+                    int startX = 200, startY = 50, size = 120, spacing = 130;
+                    for (int row = 0; row < ROWS; row++)
+                    {
+                        for (int col = 0; col < COLS; col++)
+                        {
+                            int x = startX + col * spacing;
+                            int y = startY + row * spacing;
+                            g.FillRectangle(brush, x, y, size, size);
+                        }
+                    }
+                }
+            }
+
+            if (this.BackgroundImage != null)
+            {
+                this.BackgroundImage.Dispose();
+            }
+            this.BackgroundImage = composite;
+            baseBackground.Dispose();
+
             this.Invalidate();
         }
 
@@ -349,7 +400,7 @@ namespace PiratesFortuneSlot
 
         private void InitializeGrid()
         {
-            int startX = 200, startY = 50, size = 120, spacing = 130;
+            int startX = 200, startY = 50, size = 100, spacing = 130;
             for (int row = 0; row < ROWS; row++)
             {
                 for (int col = 0; col < COLS; col++)
@@ -357,10 +408,15 @@ namespace PiratesFortuneSlot
                     pbGrid[row, col] = new PictureBox
                     {
                         Name = $"pb{row}{col}",
-                        Location = new Point(startX + col * spacing, startY + row * spacing),
+                        Location = new Point(gridCenters[row, col].X - size / 2, gridCenters[row, col].Y - size / 2),
                         Size = new Size(size, size),
-                        SizeMode = PictureBoxSizeMode.Zoom
+                        SizeMode = PictureBoxSizeMode.Zoom,
+                        BackColor = Color.Transparent,
+                        Padding = new Padding(0),
+                        Margin = new Padding(0),
+                        BorderStyle = BorderStyle.None
                     };
+
                     Controls.Add(pbGrid[row, col]);
                 }
             }
@@ -446,13 +502,14 @@ namespace PiratesFortuneSlot
 
         private void AnimateDrop()
         {
+            int startX = 200, spacing = 130;
             for (int row = 0; row < ROWS; row++)
             {
                 for (int col = 0; col < COLS; col++)
                 {
-                    pbGrid[row, col].Location = new Point(pbGrid[row, col].Left, -480);
+                    pbGrid[row, col].Location = new Point(gridCenters[row, col].X - pbGrid[row, col].Width / 2, -480);
                     pbGrid[row, col].Image = null;
-                    finalYPositions[row, col] = 50 + row * 130;
+                    finalYPositions[row, col] = gridCenters[row, col].Y - pbGrid[row, col].Height / 2;
                 }
             }
         }
@@ -557,6 +614,10 @@ namespace PiratesFortuneSlot
                     pbGrid[row, col].Image = null;
                     var sym = symbols.Find(s => s.Type == grid[row, col]);
                     pbGrid[row, col].Image = sym?.Image;
+                    pbGrid[row, col].Location = new Point(
+                        gridCenters[row, col].X - pbGrid[row, col].Width / 2,
+                        gridCenters[row, col].Y - pbGrid[row, col].Height / 2
+                    );
                 }
             }
             this.Invalidate();
@@ -615,6 +676,7 @@ namespace PiratesFortuneSlot
 
             if (hasWin)
             {
+                PlaySound("Win.wav");
                 PlaySound("Explosion.wav");
                 baseWin = (int)(totalPayout * bet * bonusMultiplier);
                 currentWin = baseWin;
@@ -659,6 +721,7 @@ namespace PiratesFortuneSlot
                     }
                     else
                     {
+                        PlaySound("Win.wav");
                         PlaySound("PirateTalk.wav");
                         inBonus = false;
                         extraSpinsAdded = 0;
@@ -703,6 +766,7 @@ namespace PiratesFortuneSlot
 
         private void EnterBonus(int scatters)
         {
+            PlaySound("Win.wav");
             PlaySound("BonusPirate.wav");
             inBonus = true;
             bonusSpins = 10 + (scatters > 3 ? 5 * (scatters - 3) : 0);
@@ -856,6 +920,10 @@ namespace PiratesFortuneSlot
             foreach (var reader in soundReaders)
             {
                 reader.Dispose();
+            }
+            if (this.BackgroundImage != null)
+            {
+                this.BackgroundImage.Dispose();
             }
         }
     }
