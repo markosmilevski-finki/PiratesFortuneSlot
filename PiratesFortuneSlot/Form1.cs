@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Media;
+using System.Reflection;
 using System.Windows.Forms;
 using System.IO;
 using NAudio.Wave;
@@ -53,6 +55,7 @@ namespace PiratesFortuneSlot
         private List<IWavePlayer> soundPlayers = new List<IWavePlayer>();
         private List<WaveFileReader> soundReaders = new List<WaveFileReader>();
         private int[,] finalYPositions = new int[ROWS, COLS];
+        private int spinCount = 0;
         private Label lblBonusSpins;
         private Label lblMultiplier;
         private Label lblGoldCoins;
@@ -63,6 +66,7 @@ namespace PiratesFortuneSlot
         private Timer tmrBaseWinDisplay;
         private Timer tmrAutoSpin;
         private Point lblWinInitialPos;
+        private int baseWin;
 
         public Form1()
         {
@@ -172,7 +176,7 @@ namespace PiratesFortuneSlot
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.BackgroundImageLayout = ImageLayout.Stretch;
-
+            this.BackgroundImage = GetEmbeddedImage("Background1.jpg");
             lblBalance.Location = new Point(25, 630);
             lblBalance.Font = new Font("Arial", 12, FontStyle.Bold);
             lblBalance.ForeColor = Color.White;
@@ -187,6 +191,7 @@ namespace PiratesFortuneSlot
             tmrDrop.Interval = 50;
             tmrCascade.Interval = 500;
 
+            LoadSounds();
             InitializeSymbols();
             if (symbols.Count == 0)
             {
@@ -199,7 +204,7 @@ namespace PiratesFortuneSlot
             GenerateGrid();
             UpdateGridDisplay();
             UpdateUI();
-            PlayBackgroundMusic();
+            PlayBackgroundMusic("BackgroundMusic.wav");
         }
 
         private void InitializeSymbols()
@@ -234,6 +239,10 @@ namespace PiratesFortuneSlot
             }
         }
 
+        private void LoadSounds()
+        {
+        }
+
         private void PlaySound(string resourceName)
         {
             try
@@ -257,16 +266,24 @@ namespace PiratesFortuneSlot
                     reader.Dispose();
                 };
             }
-            catch (Exception ex)
+            catch (Exception)
             {
             }
         }
 
-        private void PlayBackgroundMusic()
+        private void PlayBackgroundMusic(string resourceName)
         {
             try
             {
-                var stream = GetEmbeddedResourceStream("BackgroundMusic.wav");
+                if (sndBackgroundPlayer != null)
+                {
+                    sndBackgroundPlayer.Stop();
+                    sndBackgroundPlayer.Dispose();
+                    sndBackgroundReader?.Dispose();
+                    sndBackgroundPlayer = null;
+                    sndBackgroundReader = null;
+                }
+                var stream = GetEmbeddedResourceStream(resourceName);
                 if (stream == null) return;
 
                 sndBackgroundReader = new WaveFileReader(stream);
@@ -283,9 +300,24 @@ namespace PiratesFortuneSlot
                 };
                 sndBackgroundPlayer.Play();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
             }
+        }
+
+        private void UpdateBackgroundImage()
+        {
+            string imageName = inBonus ? "Stormy.jpg" : "Background1.jpg";
+            var newBackground = GetEmbeddedImage(imageName);
+            if (newBackground != null)
+            {
+                if (this.BackgroundImage != null)
+                {
+                    this.BackgroundImage.Dispose();
+                }
+                this.BackgroundImage = newBackground;
+            }
+            this.Invalidate();
         }
 
         private static Stream GetEmbeddedResourceStream(string name)
@@ -354,6 +386,7 @@ namespace PiratesFortuneSlot
             currentWin = 0;
             if (!inBonus) bonusMultiplier = 1;
             isSpinComplete = false;
+            spinCount++;
 
             PlaySound("Spin.wav");
             GenerateGrid();
@@ -437,6 +470,7 @@ namespace PiratesFortuneSlot
             lblMultiplier.Visible = inBonus;
             lblGoldCoins.Visible = inBonus;
             btnAutoSpin.Enabled = !inBonus;
+            UpdateBackgroundImage();
             this.Invalidate();
         }
 
@@ -491,6 +525,14 @@ namespace PiratesFortuneSlot
                         {
                             var sym = symbols.Find(s => s.Type == grid[row, col]);
                             pbGrid[row, col].Image = sym?.Image;
+                            if (grid[row, col] == SymbolType.GoldCoin)
+                            {
+                                PlaySound("GoldCoin.wav");
+                            }
+                            else if (grid[row, col] == SymbolType.Scatter)
+                            {
+                                PlaySound("Win.wav");
+                            }
                         }
                         allDropped = false;
                     }
@@ -573,7 +615,6 @@ namespace PiratesFortuneSlot
 
             if (hasWin)
             {
-                PlaySound("Win.wav");
                 PlaySound("Explosion.wav");
                 baseWin = (int)(totalPayout * bet * bonusMultiplier);
                 currentWin = baseWin;
@@ -618,7 +659,6 @@ namespace PiratesFortuneSlot
                     }
                     else
                     {
-                        PlaySound("Win.wav");
                         PlaySound("PirateTalk.wav");
                         inBonus = false;
                         extraSpinsAdded = 0;
@@ -632,6 +672,8 @@ namespace PiratesFortuneSlot
                         totalSpinWin = 0;
                         lblWin.Visible = false;
                         isSpinComplete = true;
+                        PlayBackgroundMusic("BackgroundMusic.wav");
+                        UpdateBackgroundImage();
                         UpdateUI();
                     }
                 }
@@ -661,7 +703,6 @@ namespace PiratesFortuneSlot
 
         private void EnterBonus(int scatters)
         {
-            PlaySound("Win.wav");
             PlaySound("BonusPirate.wav");
             inBonus = true;
             bonusSpins = 10 + (scatters > 3 ? 5 * (scatters - 3) : 0);
@@ -672,6 +713,8 @@ namespace PiratesFortuneSlot
             isAutoSpinning = false;
             btnAutoSpin.Text = "Auto Spin";
             tmrAutoSpin.Stop();
+            PlayBackgroundMusic("Stormy.wav");
+            UpdateBackgroundImage();
             MessageBox.Show("Ahoy! Treasure Hunt Bonus Activated!");
             btnSpin_Click(null, null);
         }
