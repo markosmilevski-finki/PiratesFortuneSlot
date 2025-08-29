@@ -13,6 +13,7 @@ namespace PiratesFortuneSlot
         public Label lblBiggestWin;
         public Label lblBiggestMultiplier;
         public Button btnAutoSpin;
+        public Button btnGameInfo;
         public Timer tmrWinDisplay;
         public Timer tmrBaseWinDisplay;
         public Timer tmrAutoSpin;
@@ -103,6 +104,20 @@ namespace PiratesFortuneSlot
                 Text = "Auto Spin"
             };
             _form.Controls.Add(btnAutoSpin);
+
+            btnGameInfo = new Button
+            {
+                Location = new Point(1100, 640),
+                Font = new Font("Papyrus", 12, FontStyle.Bold),
+                Size = new Size(90, 30),
+                Text = "Rules",
+                BackColor = Color.FromArgb(184, 134, 11),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                FlatAppearance = { BorderColor = Color.Gold, BorderSize = 2 }
+            };
+            btnGameInfo.Click += (s, e) => new GameInfoForm().ShowDialog();
+            _form.Controls.Add(btnGameInfo);
 
             tmrWinDisplay = new Timer
             {
