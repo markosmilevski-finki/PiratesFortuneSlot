@@ -83,6 +83,12 @@
     <Compile Include="Form1.Designer.cs">
       <DependentUpon>Form1.cs</DependentUpon>
     </Compile>
+    <Compile Include="GameInfoForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="GameInfoForm.Designer.cs">
+      <DependentUpon>GameInfoForm.cs</DependentUpon>
+    </Compile>
     <Compile Include="GridManager.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
